@@ -5,6 +5,7 @@ from datetime import date
 from decimal import Decimal
 from typing import assert_never
 
+from mortgage_simulator.simulation.investment import evaluate_investment
 from mortgage_simulator.simulation.models import (
     InterestCalculationMethod,
     MonthlyPayment,
@@ -34,6 +35,8 @@ def simulate(terms: MortgageTerms, scenario: OverpaymentScenario) -> SimulationR
     Returns:
         The ordered monthly schedule and calculated scenario summary.
     """
+    if scenario.investment is not None:
+        return evaluate_investment(terms, scenario, simulate)
     scheduled_principal = terms.principal / Decimal(terms.contractual_term_months)
     opening_balance = terms.principal
     previous_opening_balance = opening_balance
