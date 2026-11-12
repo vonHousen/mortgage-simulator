@@ -1,0 +1,104 @@
+"""Present the selected mortgage scenario."""
+
+import polars as pl
+import streamlit as st
+
+from mortgage_simulator.app.presentation.chart_controls import typical_payments_toggle
+from mortgage_simulator.app.presentation.result_metrics import (
+    render_cost_indicators,
+    render_decision_highlights,
+    render_horizon_settlement,
+    render_raw_totals,
+)
+from mortgage_simulator.app.presentation.result_tables import SCHEDULE_COLUMN_CONFIG, schedule_columns
+from mortgage_simulator.app.session_state import get_results, get_terms
+from mortgage_simulator.reporting.mortgage_charts import balance_chart, cash_outflow_chart, payment_composition_chart
+from mortgage_simulator.reporting.payment_schedules import schedule_frame
+from mortgage_simulator.reporting.scenario_comparison import compare
+
+results = get_results()
+st.title("Results")
+st.caption("Compare each overpayment strategy with the no-overpayment Baseline.")
+
+if results is None:
+    st.info("Run a simulation to compare your scenarios.", icon=":material/info:")
+    if st.button("Go to scenarios", icon=":material/arrow_back:"):
+        st.switch_page("app_pages/overpayment_scenarios.py")
+    st.stop()
+
+report = compare(results)
+terms = get_terms()
+selected_name = st.selectbox(
+    "Scenario",
+    [scenario.scenario_name for scenario in report.scenarios],
+    index=1 if len(report.scenarios) > 1 else 0,
+)
+selected = next(scenario for scenario in report.scenarios if scenario.scenario_name == selected_name)
+include_subsidy = terms.subsidy.enabled
+
+st.subheader("Raw totals")
+render_raw_totals(selected, include_subsidy=include_subsidy)
+if terms.settle_remaining_principal_at_horizon:
+    st.subheader("Horizon settlement")
+    st.caption(
+        "Every scenario repays the full original principal. Ending balances and horizon payoff timing therefore "
+        "converge, and cash-outflow differences equal mortgage-cost differences."
+    )
+    render_horizon_settlement(selected)
+st.subheader("Cost indicators")
+render_cost_indicators(selected, include_subsidy=include_subsidy)
+st.subheader("Difference from Baseline")
+render_decision_highlights(selected, include_subsidy=include_subsidy)
+
+schedule = schedule_frame(results, include_subsidy=include_subsidy)
+selected_schedule = schedule.filter(pl.col("scenario") == selected_name)
+st.subheader("Remaining principal")
+st.altair_chart(balance_chart(selected_schedule, filled=True), width="stretch")
+st.subheader("Monthly cash outflow")
+show_terminal_payment = False
+if terms.settle_remaining_principal_at_horizon:
+    show_terminal_payment = st.toggle("Show terminal payment")
+focus_on_typical_payments = typical_payments_toggle()
+st.altair_chart(
+    cash_outflow_chart(
+        selected_schedule,
+        filled=True,
+        show_terminal_payment=show_terminal_payment,
+        focus_on_typical_payments=focus_on_typical_payments,
+    ),
+    width="stretch",
+)
+st.subheader("Payment composition")
+show_after_subsidy = False
+if include_subsidy:
+    show_after_subsidy = st.toggle("Show interest after subsidy")
+st.altair_chart(
+    payment_composition_chart(
+        selected_schedule,
+        selected_name,
+        after_subsidy=show_after_subsidy,
+        show_terminal_payment=show_terminal_payment,
+        include_subsidy=include_subsidy,
+        focus_on_typical_payments=focus_on_typical_payments,
+    ),
+    width="stretch",
+)
+
+st.subheader("Monthly schedule")
+fees_column, overpayments_column = st.columns(2)
+with fees_column:
+    split_fees = st.toggle("Split fees")
+with overpayments_column:
+    split_overpayments = st.toggle("Split overpayments")
+st.dataframe(
+    selected_schedule.select(
+        schedule_columns(
+            split_fees=split_fees,
+            split_overpayments=split_overpayments,
+            include_subsidy=include_subsidy,
+        )
+    ),
+    column_config=SCHEDULE_COLUMN_CONFIG,
+    hide_index=True,
+    width="stretch",
+)

@@ -1,0 +1,40 @@
+.DS_Store
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/
+__pycache__/
+*.py[cod]
+.coverage
+.coverage.*
+coverage.xml
+coverage.json
+htmlcov/
+build/
+dist/
+*.egg-info/
+.eggs/
+*.log
+.worktrees/
+.env*
+!.env.example
+/.streamlit/secrets.toml
+
+# Financial source files and spreadsheet exports are local inputs and must not be committed.
+/data
+*.[cC][sS][vV]
+*.[xX][lL][sS]
+*.[xX][lL][sS][xX]
+*.[xX][lL][sS][mM]
+*.[oO][dD][sS]
+
+# Any reviewed public spreadsheet fixture must be restored with an explicit, path-specific ! allowlist entry.
+
+# Implementation plans are local working documents that evolve during delivery.
+docs/implementation-plans/
+
+# Detailed financial source notes are local and may contain private reference values.
+docs/private/
+.superpowers/
+docs/superpowers/
+.agents/skills/developing-with-streamlit
