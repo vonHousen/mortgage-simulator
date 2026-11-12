@@ -5,6 +5,7 @@ from typing import cast
 import polars as pl
 import streamlit as st
 
+from mortgage_simulator.app.investment_controls import INVESTMENTS_KEY
 from mortgage_simulator.app.simulation_inputs import CONSTANT_CASH_OUTFLOW_STRATEGY, FIXED_OVERPAYMENT_STRATEGY
 from mortgage_simulator.settings import AppSettings
 from mortgage_simulator.simulation.models import MortgageTerms, OverpaymentScenario, SimulationResult
@@ -35,6 +36,10 @@ def initialize_state(
         terms: Complete domain terms used for a new session.
         scenario_defaults: Overpayment scenarios used to seed new-session editors.
     """
+    if INVESTMENTS_KEY not in st.session_state:
+        st.session_state[INVESTMENTS_KEY] = {
+            scenario.name: scenario.investment for scenario in scenario_defaults if scenario.investment is not None
+        }
     if TERMS_KEY not in st.session_state:
         st.session_state[TERMS_KEY] = terms
     if SCENARIOS_KEY not in st.session_state:

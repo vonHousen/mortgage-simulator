@@ -13,6 +13,7 @@ from polars.testing import assert_frame_equal
 from streamlit.proto import Block_pb2
 from streamlit.testing.v1 import AppTest
 
+from mortgage_simulator.app.investment_controls import INVESTMENTS_KEY
 from mortgage_simulator.app.session_state import (
     FOCUS_ON_TYPICAL_PAYMENTS_KEY,
     LUMP_SUMS_KEY,
@@ -285,7 +286,7 @@ def test_scenarios_page_when_started_expect_payment_editors() -> None:
     assert len(app.dataframe) == 2
     strategy_caption = next(caption.value for caption in app.caption if "Constant cash outflow" in caption.value)
     assert "Lump sums and horizon settlement are additional" in strategy_caption
-    assert app.button[0].label == "Run simulation"
+    assert any(button.label == "Run simulation" for button in app.button)
 
 
 def test_scenarios_page_when_subsidy_disabled_expect_gross_interest_copy() -> None:
@@ -350,7 +351,7 @@ def test_scenarios_page_when_fixed_strategy_submitted_expect_fixed_overpayment_r
     app.run(timeout=10)
 
     # Act
-    app.button[0].click().run(timeout=10)
+    next(button for button in app.button if button.label == "Run simulation").click().run(timeout=10)
 
     # Assert
     results = app.session_state[RESULTS_KEY]
@@ -365,7 +366,7 @@ def test_scenarios_page_when_target_strategy_submitted_expect_target_overpayment
     app.run(timeout=10)
 
     # Act
-    app.button[0].click().run(timeout=10)
+    next(button for button in app.button if button.label == "Run simulation").click().run(timeout=10)
 
     # Assert
     payment = app.session_state[RESULTS_KEY][1].payments[24]
@@ -385,7 +386,7 @@ def test_failed_run_when_results_exist_expect_previous_results_preserved() -> No
     app.run(timeout=10)
 
     # Act
-    app.button[0].click().run(timeout=10)
+    next(button for button in app.button if button.label == "Run simulation").click().run(timeout=10)
 
     # Assert
     assert not app.exception
@@ -884,6 +885,41 @@ def test_comparison_page_when_settlement_disabled_expect_ending_balance_rows() -
     assert "Ending balance difference" in comparison_table["Metric"].to_list()
 
 
+class TestInvestmentControls:
+    """Investment management on the scenario page."""
+
+    def test_add_when_applied_expect_session_investment(self) -> None:
+        # Arrange
+        app = _scenarios_app()
+        app.run(timeout=10)
+        # Act
+        next(button for button in app.button if button.label == "Add investment").click().run()
+        # Assert
+        assert not app.exception
+        assert next(button for button in app.button if button.label == "Run simulation").disabled
+        # Act
+        app.number_input(key="deposit_capital").set_value(25000.0)
+        app.number_input(key="deposit_rate").set_value(6.0)
+        next(button for button in app.button if button.label == "Apply investment").click().run()
+        # Assert
+        assert not app.exception
+        item = app.session_state[INVESTMENTS_KEY]["Overpayment"]
+        assert item.initial_amount == Decimal("25000")
+        assert item.annual_rate == Decimal("0.06")
+        assert not next(button for button in app.button if button.label == "Run simulation").disabled
+
+    def test_add_when_cancelled_expect_no_investment(self) -> None:
+        # Arrange
+        app = _scenarios_app()
+        app.run()
+        # Act
+        next(button for button in app.button if button.label == "Add investment").click().run()
+        next(button for button in app.button if button.label == "Cancel").click().run()
+        # Assert
+        assert not app.exception
+        assert app.session_state[INVESTMENTS_KEY] == {}
+
+
 def _scenarios_app(
     strategy: str = "Fixed overpayment",
     recurring_value: float = 1000.0,
@@ -891,6 +927,7 @@ def _scenarios_app(
     terms: MortgageTerms | None = None,
 ) -> AppTest:
     app = AppTest.from_file("src/mortgage_simulator/app/app_pages/overpayment_scenarios.py")
+    app.session_state[INVESTMENTS_KEY] = {}
     app.session_state[TERMS_KEY] = terms or default_mortgage_terms()
     app.session_state[SCENARIOS_KEY] = pl.DataFrame(
         {

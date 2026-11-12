@@ -5,6 +5,7 @@ from decimal import InvalidOperation
 import streamlit as st
 from pydantic import ValidationError
 
+from mortgage_simulator.app.investment_controls import get_investments, render_investment_controls
 from mortgage_simulator.app.session_state import (
     LUMP_SUMS_KEY,
     SCENARIOS_KEY,
@@ -50,7 +51,11 @@ with st.container(border=True):
         key="lump_sum_editor",
     )
 
-if st.button("Run simulation", type="primary", icon=":material/play_arrow:"):
+pending_investment = render_investment_controls(scenario_data.get_column("name").to_list(), terms)
+if pending_investment:
+    st.caption("Apply or cancel investment edits and resolve scenario references before running.")
+
+if st.button("Run simulation", type="primary", icon=":material/play_arrow:", disabled=pending_investment):
     st.session_state[SCENARIOS_KEY] = scenario_data
     st.session_state[LUMP_SUMS_KEY] = lump_sum_data
     try:
@@ -60,7 +65,11 @@ if st.button("Run simulation", type="primary", icon=":material/play_arrow:"):
             scenario_data,  # ty: ignore[invalid-argument-type]  # Streamlit misidentifies Polars frames.
             lump_sum_data,  # ty: ignore[invalid-argument-type]  # Streamlit misidentifies Polars frames.
         )
-        results = tuple(simulate(request.terms, scenario) for scenario in request.scenarios)
+        scenarios = tuple(
+            scenario.model_copy(update={"investment": get_investments().get(scenario.name)})
+            for scenario in request.scenarios
+        )
+        results = tuple(simulate(request.terms, scenario) for scenario in scenarios)
     except (InvalidOperation, KeyError, TypeError, ValueError, ValidationError) as error:
         st.error(f"Invalid simulation input: {error}", icon=":material/error:")
     else:
