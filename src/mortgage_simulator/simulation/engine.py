@@ -36,7 +36,11 @@ def simulate(terms: MortgageTerms, scenario: OverpaymentScenario) -> SimulationR
         The ordered monthly schedule and calculated scenario summary.
     """
     if scenario.investment is not None:
-        return evaluate_investment(terms, scenario, simulate)
+        return evaluate_investment(terms, scenario, _simulate_schedule)
+    return _simulate_schedule(terms, scenario)
+
+
+def _simulate_schedule(terms: MortgageTerms, scenario: OverpaymentScenario) -> SimulationResult:
     scheduled_principal = terms.principal / Decimal(terms.contractual_term_months)
     opening_balance = terms.principal
     previous_opening_balance = opening_balance
