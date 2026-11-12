@@ -4,6 +4,7 @@ import polars as pl
 import streamlit as st
 
 from mortgage_simulator.app.presentation.chart_controls import typical_payments_toggle
+from mortgage_simulator.app.presentation.investment_results import render_investment_results
 from mortgage_simulator.app.presentation.result_metrics import (
     render_cost_indicators,
     render_decision_highlights,
@@ -35,6 +36,8 @@ selected_name = st.selectbox(
 )
 selected = next(scenario for scenario in report.scenarios if scenario.scenario_name == selected_name)
 include_subsidy = terms.subsidy.enabled
+
+render_investment_results(next(result for result in results if result.scenario_name == selected_name))
 
 st.subheader("Raw totals")
 render_raw_totals(selected, include_subsidy=include_subsidy)
