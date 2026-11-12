@@ -81,16 +81,31 @@ def _render_draft(names: list[str], terms: MortgageTerms) -> None:
     choices = [name for name in names if name == original or name not in get_investments()]
     if original not in choices:
         choices.insert(0, original)
-    name = st.selectbox("Scenario for investment", choices, key="deposit_scenario")
+    name = st.selectbox("Scenario for investment", choices, key="deposit_scenario", persist_state="session")
     left, right = st.columns(2)
     with left:
-        capital = st.number_input("Initial capital (PLN)", min_value=0.01, step=1000.0, key="deposit_capital")
-        start = st.number_input("Investment start month", min_value=1, step=1, key="deposit_start")
+        capital = st.number_input(
+            "Initial capital (PLN)", min_value=0.01, step=1000.0, key="deposit_capital", persist_state="session"
+        )
+        start = st.number_input(
+            "Investment start month", min_value=1, step=1, key="deposit_start", persist_state="session"
+        )
     with right:
-        rate = st.number_input("Annual gross deposit rate (%)", min_value=0.0, step=0.1, key="deposit_rate")
-        term = st.number_input("Deposit term (months)", min_value=1, step=1, key="deposit_term")
+        rate = st.number_input(
+            "Annual gross deposit rate (%)", min_value=0.0, step=0.1, key="deposit_rate", persist_state="session"
+        )
+        term = st.number_input(
+            "Deposit term (months)", min_value=1, step=1, key="deposit_term", persist_state="session"
+        )
         st.caption(f"{term // 12} years, {term % 12} months. Interest credited only at maturity.")
-    mode = st.segmented_control("Repayment timing", ["manual", "automatic"], key="deposit_mode")
+    mode = st.segmented_control(
+        "Repayment timing",
+        ["manual", "automatic"],
+        key="deposit_mode",
+        required=True,
+        format_func=str.title,
+        persist_state="session",
+    )
     count = st.number_input(
         "Terms before repayment (0 = immediate)", min_value=0, step=1, key="deposit_count", disabled=mode == "automatic"
     )
