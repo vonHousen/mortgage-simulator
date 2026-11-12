@@ -99,6 +99,7 @@ class RegressionMortgageTerms(RegressionManifestModel):
             subsidy=SubsidyTerms(
                 enabled=self.subsidy.enabled,
                 coefficient=self.subsidy.coefficient,
+                second_coefficient=self.subsidy.coefficient,
                 reference_rate=self.subsidy.reference_rate,
             ),
             fees=FeeTerms(

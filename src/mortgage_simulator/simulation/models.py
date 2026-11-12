@@ -53,6 +53,7 @@ class SubsidyTerms(FrozenModel):
 
     enabled: bool
     coefficient: Decimal = Field(ge=ZERO)
+    second_coefficient: Decimal = Field(ge=ZERO)
     reference_rate: Decimal = Field(ge=ZERO)
 
 
@@ -92,7 +93,7 @@ class MortgageTerms(FrozenModel):
             raise ValueError("analysis horizon exceeds the supported calendar range")
         if self.analysis_horizon_months > self.contractual_term_months:
             raise ValueError("analysis horizon must not exceed the contractual term")
-        if self.subsidy.coefficient < self.subsidy.reference_rate:
+        if min(self.subsidy.coefficient, self.subsidy.second_coefficient) < self.subsidy.reference_rate:
             raise ValueError("subsidy coefficient must not be lower than the reference rate")
         self._validate_rate_coverage()
         return self

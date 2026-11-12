@@ -40,6 +40,7 @@ class MortgageInputs(TypedDict):
     first_rate: float
     second_rate: float
     subsidy_enabled: bool
+    second_subsidy_coefficient: float
     subsidy_coefficient: float
     subsidy_reference: float
     annual_fee: float
@@ -72,6 +73,7 @@ def build_terms(inputs: MortgageInputs) -> MortgageTerms:
         subsidy=SubsidyTerms(
             enabled=inputs["subsidy_enabled"],
             coefficient=_percentage(inputs["subsidy_coefficient"]),
+            second_coefficient=_percentage(inputs["second_subsidy_coefficient"]),
             reference_rate=_percentage(inputs["subsidy_reference"]),
         ),
         fees=FeeTerms(

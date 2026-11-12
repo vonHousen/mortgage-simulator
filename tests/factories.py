@@ -20,6 +20,7 @@ def default_subsidy_terms(**updates: object) -> SubsidyTerms:
     values: dict[str, object] = {
         "enabled": True,
         "coefficient": Decimal("0.05"),
+        "second_coefficient": updates.get("coefficient", Decimal("0.05")),
         "reference_rate": Decimal("0.02"),
     }
     values.update(updates)
@@ -82,7 +83,12 @@ def synthetic_terms(
             RatePeriod(start_month=1, end_month=60, annual_rate=Decimal("0.07")),
             RatePeriod(start_month=61, end_month=120, annual_rate=Decimal("0.08")),
         ),
-        subsidy=SubsidyTerms(enabled=True, coefficient=Decimal("0.05"), reference_rate=Decimal("0.02")),
+        subsidy=SubsidyTerms(
+            enabled=True,
+            second_coefficient=Decimal("0.05"),
+            coefficient=Decimal("0.05"),
+            reference_rate=Decimal("0.02"),
+        ),
         fees=default_fee_terms(),
     )
 

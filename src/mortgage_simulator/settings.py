@@ -39,8 +39,11 @@ class SubsidyConfig(_FrozenConfig):
     enabled: bool = True
     """Whether the mortgage subsidy reduces monthly interest."""
 
-    coefficient: Decimal = Field(default=Decimal("0.05"), ge=0)
+    coefficient_months_1_60: Decimal = Field(default=Decimal("0.07"), ge=0)
     """Annual subsidy coefficient used to calculate the subsidy amount."""
+
+    coefficient_months_61_120: Decimal = Field(default=Decimal("0.055"), ge=0)
+    """Annual subsidy coefficient for months 61 through 120."""
 
     reference_rate: Decimal = Field(default=Decimal("0.02"), ge=0)
     """Annual reference rate deducted from the subsidy coefficient."""
@@ -89,7 +92,7 @@ class MortgageConfig(_FrozenConfig):
     annual_rate_months_1_60: Decimal = Field(default=Decimal("0.07"), ge=0)
     """Annual interest rate applied during payment months 1 through 60."""
 
-    annual_rate_months_61_120: Decimal = Field(default=Decimal("0.08"), ge=0)
+    annual_rate_months_61_120: Decimal = Field(default=Decimal("0.06"), ge=0)
     """Annual interest rate applied during payment months 61 through 120."""
 
     subsidy: SubsidyConfig = Field(default_factory=SubsidyConfig)
@@ -230,7 +233,8 @@ class AppSettings(BaseSettings):
             ),
             subsidy=SubsidyTerms(
                 enabled=mortgage.subsidy.enabled,
-                coefficient=mortgage.subsidy.coefficient,
+                coefficient=mortgage.subsidy.coefficient_months_1_60,
+                second_coefficient=mortgage.subsidy.coefficient_months_61_120,
                 reference_rate=mortgage.subsidy.reference_rate,
             ),
             fees=FeeTerms(

@@ -53,7 +53,7 @@ def simulate(terms: MortgageTerms, scenario: OverpaymentScenario) -> SimulationR
                 payment_date,
             )
         )
-        subsidy = _calculate_subsidy(opening_balance, terms.subsidy)
+        subsidy = _calculate_subsidy(opening_balance, terms.subsidy, month)
         monthly_insurance, monthly_fixed_fees, annual_fixed_fee = _calculate_fee_components(
             terms,
             previous_opening_balance,
@@ -132,10 +132,11 @@ def _annual_rate_for_month(rate_periods: tuple[RatePeriod, ...], month: int) -> 
     raise ValueError(f"no annual rate configured for month {month}")
 
 
-def _calculate_subsidy(opening_balance: Decimal, terms: SubsidyTerms) -> Decimal:
+def _calculate_subsidy(opening_balance: Decimal, terms: SubsidyTerms, month: int) -> Decimal:
     if not terms.enabled:
         return ZERO
-    return opening_balance * (terms.coefficient - terms.reference_rate) / MONTHS_PER_YEAR
+    coefficient = terms.coefficient if month <= 60 else terms.second_coefficient
+    return opening_balance * (coefficient - terms.reference_rate) / MONTHS_PER_YEAR
 
 
 def _payment_date(first_payment_date: date, month: int) -> date:

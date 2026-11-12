@@ -234,6 +234,7 @@ class TestSimulateBaseline:
                 "subsidy": SubsidyTerms(
                     enabled=False,
                     coefficient=original_terms.subsidy.coefficient,
+                    second_coefficient=original_terms.subsidy.coefficient,
                     reference_rate=original_terms.subsidy.reference_rate,
                 )
             }
@@ -505,6 +506,7 @@ class TestSimulateCashOutflowTarget:
                 "subsidy": SubsidyTerms(
                     enabled=False,
                     coefficient=Decimal("0.06"),
+                    second_coefficient=Decimal("0.06"),
                     reference_rate=Decimal("0"),
                 )
             }

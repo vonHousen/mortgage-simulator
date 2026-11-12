@@ -63,6 +63,13 @@ is no longer correct, and the exact approved action for restoring every affected
 - when implementing any python script to be used using CLI, use `typer`;
 - when parsing any response from LLM, use `pydantic` models to parse the response into a structured object;
 
+### Documentation
+
+- Respect Git ignore rules. Never force-add ignored files without explicit user authorization to override the ignore rule.
+
+- Do not duplicate code-defined default values in Markdown files. Link to the authoritative code instead.
+- Keep research estimates distinct from application defaults; research documents may record their analytical inputs.
+
 ### Commit messages
 
 Format: `action(scope): Description.`

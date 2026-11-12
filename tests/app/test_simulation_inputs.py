@@ -263,6 +263,7 @@ def _valid_inputs() -> MortgageInputs:
         "first_rate": 6.0,
         "second_rate": 9.0,
         "subsidy_enabled": True,
+        "second_subsidy_coefficient": 5.0,
         "subsidy_coefficient": 5.0,
         "subsidy_reference": 2.0,
         "annual_fee": 600.0,

@@ -115,24 +115,31 @@ with interest_rates:
     )
 
 subsidy_coefficient = float(terms.subsidy.coefficient * PERCENT)
+second_subsidy_coefficient = float(terms.subsidy.second_coefficient * PERCENT)
 subsidy_reference = float(terms.subsidy.reference_rate * PERCENT)
 if subsidy_enabled:
     with interest_rates.expander("Subsidy assumptions"):
-        subsidy_coefficient_column, subsidy_reference_column = st.columns(2)
+        subsidy_coefficient_column, second_subsidy_coefficient_column = st.columns(2)
         with subsidy_coefficient_column:
             subsidy_coefficient = st.number_input(
-                "Subsidy coefficient W (%)",
+                "Subsidy coefficient W, months 1-60 (%)",
                 min_value=0.0,
                 value=subsidy_coefficient,
                 step=0.01,
             )
-        with subsidy_reference_column:
-            subsidy_reference = st.number_input(
-                "Subsidized reference rate (%)",
+        with second_subsidy_coefficient_column:
+            second_subsidy_coefficient = st.number_input(
+                "Subsidy coefficient W, months 61-120 (%)",
                 min_value=0.0,
-                value=subsidy_reference,
-                step=0.01,
+                value=second_subsidy_coefficient,
+                help="The 5.5% default is an editable forecast assumption.",
             )
+        subsidy_reference = st.number_input(
+            "Subsidized reference rate (%)",
+            min_value=0.0,
+            value=subsidy_reference,
+            step=0.01,
+        )
 
 with loan_details.expander("Fee assumptions"):
     annual_fee_column, monthly_fees_column = st.columns(2)
@@ -193,6 +200,7 @@ if st.button("Save and continue", type="primary", icon=":material/arrow_forward:
         "second_rate": second_rate,
         "subsidy_enabled": subsidy_enabled,
         "subsidy_coefficient": subsidy_coefficient,
+        "second_subsidy_coefficient": second_subsidy_coefficient,
         "subsidy_reference": subsidy_reference,
         "annual_fee": annual_fee,
         "insurance_rate": insurance_rate,

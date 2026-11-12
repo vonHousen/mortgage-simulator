@@ -55,7 +55,7 @@ def test_app_when_started_expect_setup_page_and_top_navigation(
     # Assert
     assert not app.exception
     assert app.title[0].value == "Mortgage setup"
-    assert len(app.number_input) == 11
+    assert len(app.number_input) == 12
     assert {
         "Principal (PLN)",
         "Contractual term (years)",
@@ -207,7 +207,8 @@ def test_setup_assumptions_when_rendered_expect_semantic_sections_and_full_width
         "Insurance and monthly-fee end month",
     }
     assert {widget.label for widget in subsidy_assumptions.number_input} == {
-        "Subsidy coefficient W (%)",
+        "Subsidy coefficient W, months 1-60 (%)",
+        "Subsidy coefficient W, months 61-120 (%)",
         "Subsidized reference rate (%)",
     }
     insurance_method = fee_assumptions.segmented_control[0]
@@ -232,6 +233,7 @@ def test_setup_page_when_subsidy_disabled_expect_assumptions_hidden() -> None:
         subsidy=SubsidyTerms(
             enabled=False,
             coefficient=Decimal("0.05"),
+            second_coefficient=Decimal("0.05"),
             reference_rate=Decimal("0.02"),
         )
     )
@@ -246,7 +248,7 @@ def test_setup_page_when_subsidy_disabled_expect_assumptions_hidden() -> None:
     subsidy_toggle = next(toggle for toggle in app.toggle if toggle.label == "Enable BK2% subsidy")
     assert subsidy_toggle.value is False
     assert "Subsidy assumptions" not in [expander.label for expander in app.expander]
-    assert "Subsidy coefficient W (%)" not in [widget.label for widget in app.number_input]
+    assert "Subsidy coefficient W, months 1-60 (%)" not in [widget.label for widget in app.number_input]
     assert "Subsidized reference rate (%)" not in [widget.label for widget in app.number_input]
     assert app.session_state[TERMS_KEY].subsidy.coefficient == Decimal("0.05")
     assert app.session_state[TERMS_KEY].subsidy.reference_rate == Decimal("0.02")
@@ -672,6 +674,7 @@ def test_results_page_when_subsidy_disabled_expect_conventional_mortgage_outputs
             "subsidy": SubsidyTerms(
                 enabled=False,
                 coefficient=Decimal("0.05"),
+                second_coefficient=Decimal("0.05"),
                 reference_rate=Decimal("0.02"),
             )
         }
@@ -703,6 +706,7 @@ def test_comparison_page_when_subsidy_disabled_expect_subsidy_rows_omitted() -> 
             "subsidy": SubsidyTerms(
                 enabled=False,
                 coefficient=Decimal("0.05"),
+                second_coefficient=Decimal("0.05"),
                 reference_rate=Decimal("0.02"),
             )
         }

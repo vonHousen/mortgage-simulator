@@ -76,6 +76,8 @@ The reporting boundary is `compare`, defined in
 Core input types:
 
 - `MortgageTerms`: first payment date, principal, contractual term, analysis horizon, horizon-settlement option, rate periods, subsidy terms, and fee terms.
+- `SubsidyTerms`: subsidy enablement, required first-period `coefficient`, required `second_coefficient`, and shared
+  subsidized reference rate.
 - `OverpaymentScenario`: unique name, either an optional fixed recurring amount or cash-outflow target with a start
   month, and zero or more lump sums.
 - `LumpSum`: payment month and amount.
@@ -150,6 +152,12 @@ Monthly subsidy is:
 opening balance × (subsidy coefficient W − subsidized reference rate) ÷ 12
 ```
 
+W is selected by payment month: `coefficient` applies in months 1–60 and `second_coefficient` in months 61–120.
+The two coefficients are independent of contractual bank rates. The second-period application default is an editable
+analytical assumption informed by the [second-period W outlook](bk2-info/second-period-w-outlook.md); authoritative
+values and environment mapping remain in `settings.py`. Regression adapters explicitly use their manifest's
+original coefficient for both periods, preserving reference expectations.
+
 When subsidy calculations are disabled, the engine retains and validates the configured subsidy rates but returns an
 exact zero subsidy for every payment. This raises base cash outflow and leaves less room for principal overpayment
 under a constant-cash-outflow strategy.
@@ -188,7 +196,7 @@ Validation fails before simulation when:
   analysis horizon to exceed Python's calendar range;
 - the V1 horizon exceeds 120 months or the contractual term;
 - rates or payment amounts are negative;
-- the subsidy coefficient is lower than the subsidized reference rate;
+- either subsidy coefficient is lower than the subsidized reference rate, including when subsidies are disabled;
 - an overpayment month lies outside the analysis horizon;
 - both fixed recurring overpayment and cash-outflow target are positive in one scenario;
 - a positive recurring amount or cash-outflow target has no valid start month, or a start month has neither value;
@@ -205,7 +213,8 @@ The input area groups mortgage terms, interest calculation, subsidy assumptions,
 payment date anchors calendar-day schedules, and equal months remains available for workbook comparison. A toggle
 beside the analysis horizon controls terminal principal settlement. An always-visible toggle in Interest rates
 controls BK2% subsidy calculations. Its detailed Subsidy assumptions expander is hidden when the subsidy is off,
-while the stored rates remain unchanged. Initial selections come from
+while both stored W values and the reference rate remain unchanged. The expander places the two period-specific
+W inputs side by side, with the shared reference rate below. Initial selections come from
 [`settings.py`](../src/mortgage_simulator/settings.py). Saving mortgage terms invalidates previous simulation results.
 
 A scenario editor supports multiple named scenarios with `name`, `strategy`, `recurring_value`, and `start_month`

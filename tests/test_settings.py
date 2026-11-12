@@ -26,9 +26,9 @@ class TestAppSettings:
         assert settings.mortgage.first_payment_date == date(2024, 1, 1)
         assert settings.mortgage.principal == Decimal("500000")
         assert settings.mortgage.annual_rate_months_1_60 == Decimal("0.07")
-        assert settings.mortgage.annual_rate_months_61_120 == Decimal("0.08")
+        assert settings.mortgage.annual_rate_months_61_120 == Decimal("0.06")
         assert settings.mortgage.subsidy.enabled is True
-        assert settings.mortgage.subsidy.coefficient == Decimal("0.05")
+        assert settings.mortgage.subsidy.coefficient_months_1_60 == Decimal("0.07")
         assert settings.mortgage.subsidy.reference_rate == Decimal("0.02")
         assert settings.mortgage.fees.annual_fixed_fee == Decimal("0")
         assert settings.mortgage.fees.monthly_insurance_rate == Decimal("0")
@@ -88,7 +88,7 @@ class TestAppSettings:
             "MS_MORTGAGE__ANNUAL_RATE_MONTHS_1_60=0.06\n"
             "MS_MORTGAGE__ANNUAL_RATE_MONTHS_61_120=0.09\n"
             "MS_MORTGAGE__SUBSIDY__ENABLED=false\n"
-            "MS_MORTGAGE__SUBSIDY__COEFFICIENT=0.08\n"
+            "MS_MORTGAGE__SUBSIDY__COEFFICIENT_MONTHS_1_60=0.08\n"
             "MS_MORTGAGE__SUBSIDY__REFERENCE_RATE=0.03\n"
             "MS_MORTGAGE__FEES__ANNUAL_FIXED_FEE=650\n"
             "MS_MORTGAGE__FEES__MONTHLY_INSURANCE_RATE=0.0005\n"

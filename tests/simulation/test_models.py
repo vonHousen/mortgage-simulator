@@ -77,6 +77,7 @@ class TestMortgageTerms:
         # Arrange
         subsidy = default_subsidy_terms(
             coefficient=Decimal("0.01"),
+            second_coefficient=Decimal("0.01"),
             reference_rate=Decimal("0.02"),
         )
 
