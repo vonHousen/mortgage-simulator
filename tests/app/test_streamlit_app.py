@@ -919,6 +919,44 @@ class TestInvestmentControls:
         assert not app.exception
         assert app.session_state[INVESTMENTS_KEY] == {}
 
+    def test_draft_when_navigating_and_switching_modes_expect_term_count_preserved(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        # Arrange
+        count = 7
+        app_path = Path("src/mortgage_simulator/app/streamlit_app.py").resolve()
+        monkeypatch.chdir(tmp_path)
+        app = AppTest.from_file(app_path).run()
+        app.session_state[SCENARIOS_KEY] = pl.DataFrame(
+            {
+                "name": ["Deposit"],
+                "strategy": ["Fixed overpayment"],
+                "recurring_value": [0.0],
+                "start_month": [None],
+            },
+            schema={"name": pl.String, "strategy": pl.String, "recurring_value": pl.Float64, "start_month": pl.Int64},
+        )
+        app.switch_page("app_pages/overpayment_scenarios.py").run()
+        next(button for button in app.button if button.label == "Add investment").click().run()
+        app.number_input(key="deposit_count").set_value(count).run()
+        # Act
+        app.switch_page("app_pages/mortgage_setup.py").run()
+        app.switch_page("app_pages/overpayment_scenarios.py").run()
+        # Assert
+        assert not app.exception
+        assert app.number_input(key="deposit_count").value == count
+        # Act
+        app.segmented_control(key="deposit_mode").set_value("automatic").run()
+        app.segmented_control(key="deposit_mode").set_value("manual").run()
+        # Assert
+        assert app.number_input(key="deposit_count").value == count
+        # Act
+        next(button for button in app.button if button.label == "Cancel").click().run()
+        app.run()
+        # Assert
+        assert not app.exception
+        assert app.session_state[INVESTMENTS_KEY] == {}
+
 
 def _scenarios_app(
     strategy: str = "Fixed overpayment",

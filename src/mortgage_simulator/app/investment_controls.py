@@ -107,7 +107,12 @@ def _render_draft(names: list[str], terms: MortgageTerms) -> None:
         persist_state="session",
     )
     count = st.number_input(
-        "Terms before repayment (0 = immediate)", min_value=0, step=1, key="deposit_count", disabled=mode == "automatic"
+        "Terms before repayment (0 = immediate)",
+        min_value=0,
+        step=1,
+        key="deposit_count",
+        disabled=mode == "automatic",
+        persist_state="session",
     )
     if mode == "manual":
         maturity = start + count * term

@@ -37,3 +37,20 @@ repeat affected interactions. AppTest does not replace personal visual inspectio
 
 Run `just ci` and `just e2e-regression-tests`. Reference values and manifests are immutable. Missing artifacts or
 failures block completion. Keep ignored synthetic configuration out of commits.
+
+## Verification performed
+
+Three fresh Luna agents used isolated fixtures under `.worktrees/deposit-verification-1`,
+`.worktrees/deposit-verification-2`, and `.worktrees/deposit-verification-3`. Arithmetic and mortgage interaction
+cases passed; exhaustive manual candidates matched the optimizer. JSON-backed AppTest sessions loaded their
+configured investments and produced results.
+
+Interactive AppTest verification initially encountered stale term-count state. A subsequent targeted test
+reproduced a real navigation defect: an edited manual term count reset when navigating away and returning.
+Session persistence fixes that defect. The regression test now verifies navigation, automatic/manual switching,
+cancellation, and a subsequent rerun without exceptions.
+
+Live visual inspection was **not completed**: the browser host was unavailable, and native-browser screenshots
+remained frozen on an older app at port 8501 despite accessibility state showing navigation to port 8511.
+Automated interaction coverage does not establish visual quality; personal screenshot-based UI/UX inspection remains
+outstanding until browser access works.
