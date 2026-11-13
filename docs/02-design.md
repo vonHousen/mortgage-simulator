@@ -35,7 +35,7 @@ prevents startup. Scenario JSON never overrides mortgage settings or the baselin
 ### Logic
 
 [`simulation/engine.py`](../src/mortgage_simulator/simulation/engine.py) coordinates scenario evaluation. The shared mortgage calculator in
-[`simulation/mortgage_schedule.py`](../src/mortgage_simulator/simulation/mortgage_schedule.py) operates on
+[`simulation/mortgage/schedule.py`](../src/mortgage_simulator/simulation/mortgage/schedule.py) operates on
 `Decimal` values. The `simulation` package must not import Streamlit, Polars, Altair, openpyxl, or environment
 configuration. It produces immutable typed monthly records and summaries.
 

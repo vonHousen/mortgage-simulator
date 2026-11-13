@@ -2,7 +2,7 @@
 
 from mortgage_simulator.simulation.investment.evaluation import evaluate_investment
 from mortgage_simulator.simulation.models import MortgageTerms, OverpaymentScenario, SimulationResult
-from mortgage_simulator.simulation.mortgage_schedule import calculate_schedule
+from mortgage_simulator.simulation.mortgage.schedule import calculate_schedule
 
 
 def simulate(terms: MortgageTerms, scenario: OverpaymentScenario) -> SimulationResult:

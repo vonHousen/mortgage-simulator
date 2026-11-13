@@ -10,7 +10,7 @@ The private source data and detailed empirical results remain Git-ignored.
 
 The engine supports opening-balance, midpoint-balance, and two-interval-weighted insured balances. Their authoritative
 definitions are implemented in
-[`monthly_insurance.py`](../src/mortgage_simulator/simulation/monthly_insurance.py), and the available model values live
+[`monthly_insurance.py`](../src/mortgage_simulator/simulation/mortgage/insurance.py), and the available model values live
 in [`simulation/models.py`](../src/mortgage_simulator/simulation/models.py).
 
 The two-interval-weighted method had the best fit to the reviewed series. It uses adjacent balances and payment-period

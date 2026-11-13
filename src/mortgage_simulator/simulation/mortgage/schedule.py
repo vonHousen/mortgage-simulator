@@ -15,7 +15,7 @@ from mortgage_simulator.simulation.models import (
     SimulationSummary,
     SubsidyTerms,
 )
-from mortgage_simulator.simulation.monthly_insurance import calculate_monthly_insurance
+from mortgage_simulator.simulation.mortgage.insurance import calculate_monthly_insurance
 
 MONTHS_PER_YEAR = Decimal("12")
 ANNUAL_FEE_INTERVAL_MONTHS = 12

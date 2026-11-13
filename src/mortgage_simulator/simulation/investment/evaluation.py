@@ -15,7 +15,7 @@ from mortgage_simulator.simulation.models import (
     SimulationRequest,
     SimulationResult,
 )
-from mortgage_simulator.simulation.mortgage_schedule import calculate_schedule
+from mortgage_simulator.simulation.mortgage.schedule import calculate_schedule
 
 ZERO = Decimal("0")
 

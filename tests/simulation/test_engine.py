@@ -2,7 +2,7 @@
 
 from mortgage_simulator.simulation.engine import simulate
 from mortgage_simulator.simulation.models import OverpaymentScenario
-from mortgage_simulator.simulation.mortgage_schedule import calculate_schedule
+from mortgage_simulator.simulation.mortgage.schedule import calculate_schedule
 from tests.factories import default_mortgage_terms, synthetic_overpayment_scenario
 
 
