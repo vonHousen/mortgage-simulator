@@ -30,20 +30,21 @@ regression-insurance:
 
 e2e-regression-tests: regression-excel regression-calendar regression-insurance
 
-lint:
-    uv run ruff check .
+pre-commit *args:
+    uv run --locked pre-commit run --all-files --show-diff-on-failure {{args}}
 
-format:
-    uv run ruff format .
+hooks-install:
+    uv run --locked pre-commit install
 
-format-check:
-    uv run ruff format --check .
+lint: (pre-commit "ruff-check")
 
-typecheck:
-    uv run mypy
-    uv run ty check
+format: (pre-commit "ruff-format")
 
-lock-check:
-    uv lock --check
+mypy:
+    uv run --locked mypy
 
-ci: lock-check lint format-check typecheck test
+typecheck: mypy (pre-commit "ty")
+
+lock-check: (pre-commit "uv-lock")
+
+ci: pre-commit mypy test

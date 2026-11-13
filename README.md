@@ -41,12 +41,27 @@ to an instance that untrusted users can access.
 
 ## Development
 
-Install the locked development environment and run the same checks as GitHub Actions:
+Development also requires [lychee](https://github.com/lycheeverse/lychee), available on macOS with
+`brew install lychee`. Install it using your platform's package manager before running the shared checks.
+
+Install the locked development environment, enable commit hooks, and run the same checks as GitHub Actions:
 
 ```bash
 just sync
+just hooks-install
 just ci
 ```
+
+Git commits run the shared pre-commit bundle on staged files. `just pre-commit` runs that bundle on all tracked
+files; `just ci` runs it locally (including lychee), followed by mypy and pytest. The bundle validates the uv lockfile,
+runs Ruff lint and formatting plus ty, validates YAML/TOML, checks for conflict markers and private keys, and cleans
+up whitespace and final newlines. Lychee checks local documentation links offline; external websites are not checked.
+
+Ruff applies safe lint fixes and formatting automatically. Whitespace hooks also apply fixes; when hooks modify
+files, the run fails so you can review and stage the changes before retrying. This behavior is the same in CI.
+`just lint` also applies safe fixes. Use `just pre-commit lychee` to run only the link checker, or `just typecheck`
+to run both mypy and ty. All Python checks use the versions in `uv.lock`; uv, Just, and lychee are external tools.
+The shared bundle replaces the former `just format-check` command.
 
 Use `just` to list all available recipes. Before merges and important commits, maintainers with the reviewed local
 reference artifacts and matching private manifests must also run:

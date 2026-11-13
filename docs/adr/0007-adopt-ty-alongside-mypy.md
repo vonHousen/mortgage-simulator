@@ -1,6 +1,6 @@
 # ADR 0007: Adopt ty alongside mypy
 
-- Status: Accepted
+- Status: Superseded in part by [ADR 0009](0009-share-pre-commit-checks-with-ci.md) for check orchestration.
 - Date: 2026-08-01
 
 ## Context

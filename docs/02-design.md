@@ -265,7 +265,8 @@ errors fail fast and are logged with exception context; the UI must not silently
   [06-calendar-regression-testing.md](06-calendar-regression-testing.md).
 - The local insurance suite compares all three insured-balance strategies with the reviewed charge series and enforces
   the residual limits described in [07-monthly-insurance-calculation-research.md](07-monthly-insurance-calculation-research.md).
-- GitHub Actions runs lock validation, Ruff, mypy, and pytest through `just ci`.
+- Local and GitHub Actions CI run the shared pre-commit bundle (including ty and offline lychee), mypy, and pytest
+  through `just ci`, as described in [ADR 0009](adr/0009-share-pre-commit-checks-with-ci.md).
 
 ## Implementation status
 

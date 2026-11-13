@@ -50,5 +50,6 @@ defaults, source precedence, and validation. Authoritative setting names and def
 | [0004](adr/0004-use-scalar-settings-for-fixed-rate-periods.md) | Superseded in part by 0008 | Configure the two UI rate periods with paired scalar settings. |
 | [0005](adr/0005-use-local-json-for-scenario-defaults.md) | Superseded in part by 0008 | Seed editable scenarios from optional local JSON. |
 | [0006](adr/0006-organize-source-by-responsibility.md) | Accepted | Organize the package around simulation, reporting, reference-data, and app boundaries. |
-| [0007](adr/0007-adopt-ty-alongside-mypy.md) | Accepted | Run ty alongside strict mypy checking. |
+| [0007](adr/0007-adopt-ty-alongside-mypy.md) | Superseded in part by 0009 | Run ty alongside strict mypy checking. |
 | [0008](adr/0008-centralize-environment-configuration.md) | Accepted | Centralize environment configuration under a grouped settings model. |
+| [0009](adr/0009-share-pre-commit-checks-with-ci.md) | Accepted | Share pre-commit checks with local and hosted CI; run only ty before commits and both type checkers in CI. |
