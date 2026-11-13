@@ -13,6 +13,7 @@ from polars.testing import assert_frame_equal
 from streamlit.proto import Block_pb2
 from streamlit.testing.v1 import AppTest
 
+from mortgage_simulator.app.investment_controls import INVESTMENTS_KEY
 from mortgage_simulator.app.session_state import (
     FOCUS_ON_TYPICAL_PAYMENTS_KEY,
     LUMP_SUMS_KEY,
@@ -24,8 +25,10 @@ from mortgage_simulator.app.streamlit_app import main
 from mortgage_simulator.reporting.payment_schedules import schedule_frame
 from mortgage_simulator.simulation.engine import simulate
 from mortgage_simulator.simulation.models import (
+    DepositInvestment,
     InsuranceCalculationMethod,
     InterestCalculationMethod,
+    InvestmentMode,
     MortgageTerms,
     OverpaymentScenario,
     SimulationResult,
@@ -285,7 +288,7 @@ def test_scenarios_page_when_started_expect_payment_editors() -> None:
     assert len(app.dataframe) == 2
     strategy_caption = next(caption.value for caption in app.caption if "Constant cash outflow" in caption.value)
     assert "Lump sums and horizon settlement are additional" in strategy_caption
-    assert app.button[0].label == "Run simulation"
+    assert any(button.label == "Run simulation" for button in app.button)
 
 
 def test_scenarios_page_when_subsidy_disabled_expect_gross_interest_copy() -> None:
@@ -350,7 +353,7 @@ def test_scenarios_page_when_fixed_strategy_submitted_expect_fixed_overpayment_r
     app.run(timeout=10)
 
     # Act
-    app.button[0].click().run(timeout=10)
+    next(button for button in app.button if button.label == "Run simulation").click().run(timeout=10)
 
     # Assert
     results = app.session_state[RESULTS_KEY]
@@ -365,7 +368,7 @@ def test_scenarios_page_when_target_strategy_submitted_expect_target_overpayment
     app.run(timeout=10)
 
     # Act
-    app.button[0].click().run(timeout=10)
+    next(button for button in app.button if button.label == "Run simulation").click().run(timeout=10)
 
     # Assert
     payment = app.session_state[RESULTS_KEY][1].payments[24]
@@ -385,7 +388,7 @@ def test_failed_run_when_results_exist_expect_previous_results_preserved() -> No
     app.run(timeout=10)
 
     # Act
-    app.button[0].click().run(timeout=10)
+    next(button for button in app.button if button.label == "Run simulation").click().run(timeout=10)
 
     # Assert
     assert not app.exception
@@ -419,13 +422,13 @@ def test_results_page_when_simulation_exists_expect_highlights_and_raw_totals() 
 
     # Assert
     assert not app.exception
-    assert len(app.metric) == 23
+    assert len(app.metric) == 26
     assert [metric.label for metric in app.metric[:8]] == [
-        "Total cash outflow",
+        "Total mortgage payments",
         "Principal repaid",
         "Total mortgage cost",
         "Ending balance",
-        "Gross interest",
+        "Gross mortgage interest",
         "Fees paid",
         "Subsidy received",
         "Payoff month",
@@ -437,14 +440,23 @@ def test_results_page_when_simulation_exists_expect_highlights_and_raw_totals() 
         "Settlement reduction vs Baseline",
     ]
     assert [metric.label for metric in app.metric[12:15]] == [
+        "Net financing cost",
+        "Total mortgage cost",
+        "Net investment earnings",
+    ]
+    assert "Net financing cost = Total mortgage cost - Net investment earnings" in app.metric[12].proto.help
+    assert "Principal repays borrowed capital" in app.metric[13].proto.help
+    assert "Gross deposit interest - Deposit tax" in app.metric[14].proto.help
+    assert "not your personal cash contribution" in app.metric[0].proto.help
+    assert [metric.label for metric in app.metric[15:18]] == [
         "Cost / original principal",
         "Cost / principal repaid",
         "Net average annual interest rate",
     ]
-    assert [metric.label for metric in app.metric[15:]] == [
-        "Total mortgage cost saved",
+    assert [metric.label for metric in app.metric[18:]] == [
+        "Net financing cost saved",
         "Balance reduced",
-        "Additional cash paid",
+        "Additional mortgage payments",
         "Payoff timing",
         "Interest saved",
         "Subsidy difference",
@@ -458,7 +470,7 @@ def test_results_page_when_simulation_exists_expect_highlights_and_raw_totals() 
     assert metrics["Terminal settlement"].value == "0.00 PLN"
     assert metrics["Principal deferred to settlement"].value == "0.00%"
     assert metrics["Settlement reduction vs Baseline"].value == "0.00 PLN"
-    assert metrics["Total mortgage cost saved"].value == "22,875.87 PLN"
+    assert metrics["Net financing cost saved"].value == "22,875.87 PLN"
     assert metrics["Interest saved"].value == "37,125.87 PLN"
     assert metrics["Subsidy difference"].value == "-14,250.00 PLN"
     assert metrics["Net average annual interest rate difference"].value == "-0.05 p.p."
@@ -471,15 +483,15 @@ def test_results_page_when_simulation_exists_expect_highlights_and_raw_totals() 
         "Baseline ending balance minus this scenario's ending balance. "
         "It is the additional principal eliminated by the analysis horizon."
     )
-    assert metrics["Additional cash paid"].proto.help == (
-        "This scenario's total cash outflow minus Baseline total cash outflow. "
+    assert metrics["Additional mortgage payments"].proto.help == (
+        "This scenario's Total mortgage payments minus Baseline Total mortgage payments. "
         "It includes additional principal and changes in interest, subsidy, and fees."
     )
-    subheaders = [subheader.value for subheader in app.subheader]
+    subheaders = [expander.label for expander in app.expander]
     assert subheaders[:4] == ["Raw totals", "Horizon settlement", "Cost indicators", "Difference from Baseline"]
-    assert {"Remaining principal", "Monthly cash outflow", "Payment composition"}.issubset(
-        subheader.value for subheader in app.subheader
-    )
+    assert {"Remaining principal", "Monthly cash outflow", "Payment composition"}.issubset(subheaders)
+    expanded_sections = {"Cost indicators", "Difference from Baseline", "Remaining principal", "Payment composition"}
+    assert {expander.label for expander in app.expander if expander.proto.expanded} == expanded_sections
     results_charts = app.get("vega_lite_chart")
     first_results_spec = json.loads(results_charts[0].proto.spec)
     second_results_spec = json.loads(results_charts[1].proto.spec)
@@ -513,7 +525,7 @@ def test_results_page_when_schedule_toggles_are_disabled_expect_aggregate_column
     assert [column.toggle[0].label for column in schedule_toggle_columns] == ["Split fees", "Split overpayments"]
     assert [column.toggle[0].value for column in schedule_toggle_columns] == [False, False]
     page_elements = list(app)
-    monthly_schedule = next(subheader for subheader in app.subheader if subheader.value == "Monthly schedule")
+    monthly_schedule = next(expander for expander in app.expander if expander.label == "Monthly schedule")
     schedule_toggles = [toggle for toggle in app.toggle if toggle.label in {"Split fees", "Split overpayments"}]
     assert len(schedule_toggles) == 2
     monthly_schedule_index = page_elements.index(monthly_schedule)
@@ -655,7 +667,7 @@ def test_results_page_when_settlement_disabled_expect_no_settlement_section() ->
 
     # Assert
     assert not app.exception
-    assert len(app.metric) == 19
+    assert len(app.metric) == 22
     assert "Horizon settlement" not in [subheader.value for subheader in app.subheader]
     assert [toggle.label for toggle in app.toggle] == [
         "Focus on typical payments",
@@ -884,6 +896,115 @@ def test_comparison_page_when_settlement_disabled_expect_ending_balance_rows() -
     assert "Ending balance difference" in comparison_table["Metric"].to_list()
 
 
+class TestInvestmentControls:
+    """Investment management on the scenario page."""
+
+    def test_add_when_applied_expect_session_investment(self) -> None:
+        # Arrange
+        app = _scenarios_app()
+        app.run(timeout=10)
+        # Act
+        next(button for button in app.button if button.label == "Add investment").click().run()
+        # Assert
+        assert not app.exception
+        assert next(button for button in app.button if button.label == "Run simulation").disabled
+        # Act
+        app.number_input(key="deposit_capital").set_value(25000.0)
+        app.number_input(key="deposit_rate").set_value(6.0)
+        next(button for button in app.button if button.label == "Apply investment").click().run()
+        # Assert
+        assert not app.exception
+        item = app.session_state[INVESTMENTS_KEY]["Overpayment"]
+        assert item.initial_amount == Decimal("25000")
+        assert item.annual_rate == Decimal("0.06")
+        assert not next(button for button in app.button if button.label == "Run simulation").disabled
+
+    def test_add_when_cancelled_expect_no_investment(self) -> None:
+        # Arrange
+        app = _scenarios_app()
+        app.run()
+        # Act
+        next(button for button in app.button if button.label == "Add investment").click().run()
+        next(button for button in app.button if button.label == "Cancel").click().run()
+        # Assert
+        assert not app.exception
+        assert app.session_state[INVESTMENTS_KEY] == {}
+
+    def test_draft_when_navigating_and_switching_modes_expect_term_count_preserved(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        # Arrange
+        count = 7
+        app_path = Path("src/mortgage_simulator/app/streamlit_app.py").resolve()
+        monkeypatch.chdir(tmp_path)
+        app = AppTest.from_file(app_path).run()
+        app.session_state[SCENARIOS_KEY] = pl.DataFrame(
+            {
+                "name": ["Deposit"],
+                "strategy": ["Fixed overpayment"],
+                "recurring_value": [0.0],
+                "start_month": [None],
+            },
+            schema={"name": pl.String, "strategy": pl.String, "recurring_value": pl.Float64, "start_month": pl.Int64},
+        )
+        app.switch_page("app_pages/overpayment_scenarios.py").run()
+        next(button for button in app.button if button.label == "Add investment").click().run()
+        app.number_input(key="deposit_count").set_value(count).run()
+        # Act
+        app.switch_page("app_pages/mortgage_setup.py").run()
+        app.switch_page("app_pages/overpayment_scenarios.py").run()
+        # Assert
+        assert not app.exception
+        assert app.number_input(key="deposit_count").value == count
+        # Act
+        app.segmented_control(key="deposit_mode").set_value("automatic").run()
+        app.segmented_control(key="deposit_mode").set_value("manual").run()
+        # Assert
+        assert app.number_input(key="deposit_count").value == count
+        # Act
+        next(button for button in app.button if button.label == "Cancel").click().run()
+        app.run()
+        # Assert
+        assert not app.exception
+        assert app.session_state[INVESTMENTS_KEY] == {}
+
+
+def test_results_when_automatic_investment_expect_objective_and_candidate_metric() -> None:
+    # Arrange
+    terms = default_mortgage_terms()
+    investment = DepositInvestment(
+        initial_amount=Decimal("10000"),
+        start_month=1,
+        annual_rate=Decimal("0.10"),
+        term_months=12,
+        mode=InvestmentMode.AUTOMATIC,
+    )
+    results = (
+        simulate(terms, OverpaymentScenario(name="Baseline")),
+        simulate(terms, OverpaymentScenario(name="Invest", investment=investment)),
+    )
+    app = _results_app(results, terms)
+    # Act
+    app.run()
+    # Assert
+    assert not app.exception
+    assert len([metric for metric in app.metric if metric.label == "Net investment earnings"]) == 1
+    assert any("Net financing savings versus immediate repayment" in item.value for item in app.caption)
+    candidates = next(frame.value for frame in app.dataframe if "Net financing cost (PLN)" in frame.value.columns)
+    assert candidates["Net financing cost (PLN)"].iloc[0] == float(results[1].net_financing_cost)
+    assert candidates["Recommended"].iloc[0]
+    outcome = next(expander for expander in app.expander if expander.label == "Investment outcome")
+    assert not outcome.proto.expanded
+    recommendation = next(expander for expander in app.expander if expander.label.startswith("Recommended:"))
+    assert not recommendation.proto.expanded
+    saving = next(metric for metric in app.metric if metric.label == "Net financing cost saved")
+    expected_saving = results[0].net_financing_cost - results[1].net_financing_cost
+    assert saving.value == f"{expected_saving:,.2f} PLN"
+    assert "Net financing cost = Total mortgage cost - Net investment earnings" in saving.proto.help
+    surplus = next(metric for metric in app.metric if metric.label == "Retained surplus")
+    assert "do not subtract it again" in surplus.proto.help
+
+
 def _scenarios_app(
     strategy: str = "Fixed overpayment",
     recurring_value: float = 1000.0,
@@ -891,6 +1012,7 @@ def _scenarios_app(
     terms: MortgageTerms | None = None,
 ) -> AppTest:
     app = AppTest.from_file("src/mortgage_simulator/app/app_pages/overpayment_scenarios.py")
+    app.session_state[INVESTMENTS_KEY] = {}
     app.session_state[TERMS_KEY] = terms or default_mortgage_terms()
     app.session_state[SCENARIOS_KEY] = pl.DataFrame(
         {

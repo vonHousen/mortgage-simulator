@@ -19,7 +19,7 @@ PAYMENT_COMPONENT_LABELS = {
     "lump_sum": "Lump sum",
     "horizon_settlement": "Horizon settlement",
     "fees": "Fees",
-    "interest": "Gross interest",
+    "interest": "Gross mortgage interest",
     "interest_after_subsidy": "Interest after subsidy",
     "subsidy": "Subsidy",
 }

@@ -6,6 +6,29 @@ import streamlit as st
 
 from mortgage_simulator.simulation.models import ScenarioComparison
 
+NET_FINANCING_COST_HELP = (
+    "Net financing cost = Total mortgage cost - Net investment earnings. Lower is better. "
+    "This is the automatic timing objective; principal repayments are excluded. "
+    "A negative value means deposit earnings exceed mortgage charges. "
+    "Earnings may already have repaid mortgage principal; they are not necessarily cash left in your account."
+)
+MORTGAGE_COST_HELP = (
+    "Total mortgage cost = Gross mortgage interest - Subsidy received + Fees paid. "
+    "Principal repays borrowed capital and is excluded from financing charges. Deposit earnings are excluded here."
+)
+INVESTMENT_EARNINGS_HELP = (
+    "Net investment earnings = Gross deposit interest - Deposit tax. "
+    "Included in the repayment balance or retained funds; deducted once in Net financing cost."
+)
+MORTGAGE_PAYMENTS_HELP = (
+    "Total mortgage payments = Principal repaid + Gross mortgage interest - Subsidy received + Fees paid. "
+    "Includes deposit-funded repayments; this is not your personal cash contribution or overall financial benefit."
+)
+RETAINED_SURPLUS_HELP = (
+    "Retained surplus = Final deposit balance - Applied to mortgage. May include original capital and earnings; "
+    "do not subtract it again from Net financing cost."
+)
+
 
 def pln(value: Decimal) -> str:
     """Format a complete PLN amount.
@@ -79,16 +102,16 @@ def interest_saved(selected: ScenarioComparison) -> Decimal:
     return -selected.interest_delta
 
 
-def total_mortgage_cost_saved(selected: ScenarioComparison) -> Decimal:
-    """Return total mortgage cost reduction relative to Baseline.
+def net_financing_cost_saved(selected: ScenarioComparison) -> Decimal:
+    """Return net financing cost reduction relative to Baseline.
 
     Args:
         selected: Scenario comparison containing the Baseline delta.
 
     Returns:
-        Positive amount when the selected scenario reduces total mortgage cost.
+        Positive amount when the selected scenario reduces net financing cost.
     """
-    return -selected.mortgage_cost_delta
+    return -selected.net_financing_cost_delta
 
 
 def balance_reduction(selected: ScenarioComparison) -> Decimal:
@@ -136,9 +159,13 @@ def render_decision_highlights(selected: ScenarioComparison, *, include_subsidy:
     """
     first_row = st.columns(4)
     first_row[0].metric(
-        "Total mortgage cost saved",
-        pln(total_mortgage_cost_saved(selected)),
-        help="Baseline total mortgage cost minus this scenario's total mortgage cost.",
+        "Net financing cost saved",
+        pln(net_financing_cost_saved(selected)),
+        help=(
+            "Baseline Net financing cost - This scenario's Net financing cost. "
+            "Positive means lower combined cost after deposit earnings. "
+            "Net financing cost = Total mortgage cost - Net investment earnings."
+        ),
         border=True,
     )
     first_row[1].metric(
@@ -151,10 +178,10 @@ def render_decision_highlights(selected: ScenarioComparison, *, include_subsidy:
         border=True,
     )
     first_row[2].metric(
-        "Additional cash paid",
+        "Additional mortgage payments",
         pln(additional_cash_paid(selected)),
         help=(
-            "This scenario's total cash outflow minus Baseline total cash outflow. "
+            "This scenario's Total mortgage payments minus Baseline Total mortgage payments. "
             + (
                 "It includes additional principal and changes in interest, subsidy, and fees."
                 if include_subsidy
@@ -201,6 +228,13 @@ def render_cost_indicators(selected: ScenarioComparison, *, include_subsidy: boo
         include_subsidy: Whether average interest is net of subsidy.
     """
     summary = selected.summary
+    with st.container(horizontal=True, vertical_alignment="center"):
+        with st.container(border=True):
+            st.badge("Primary decision metric", icon=":material/flag:", color="blue")
+            st.metric("Net financing cost", pln(selected.net_financing_cost), help=NET_FINANCING_COST_HELP)
+            st.caption("Lower is better · Total mortgage cost - Net investment earnings")
+        st.metric("Total mortgage cost", pln(summary.total_mortgage_cost), help=MORTGAGE_COST_HELP)
+        st.metric("Net investment earnings", pln(selected.net_investment_earnings), help=INVESTMENT_EARNINGS_HELP)
     columns = st.columns(3)
     columns[0].metric(
         "Cost / original principal",
@@ -263,30 +297,22 @@ def render_raw_totals(selected: ScenarioComparison, *, include_subsidy: bool = T
     summary = selected.summary
     first_row = st.columns(4)
     first_row[0].metric(
-        "Total cash outflow",
+        "Total mortgage payments",
         pln(summary.total_cash_outflow),
-        help=(
-            "Principal repaid plus gross interest, minus subsidy, plus fees during the analysis horizon."
-            if include_subsidy
-            else "Principal repaid plus gross interest and fees during the analysis horizon."
-        ),
+        help=MORTGAGE_PAYMENTS_HELP,
         border=True,
     )
     first_row[1].metric("Principal repaid", pln(summary.total_principal), border=True)
     first_row[2].metric(
         "Total mortgage cost",
         pln(summary.total_mortgage_cost),
-        help=(
-            "Gross interest minus subsidy plus fees; principal repayment is excluded."
-            if include_subsidy
-            else "Gross interest plus fees; principal repayment is excluded."
-        ),
+        help=MORTGAGE_COST_HELP,
         border=True,
     )
     first_row[3].metric("Ending balance", pln(summary.ending_balance), border=True)
 
     second_row = st.columns(4 if include_subsidy else 3)
-    second_row[0].metric("Gross interest", pln(summary.total_interest), border=True)
+    second_row[0].metric("Gross mortgage interest", pln(summary.total_interest), border=True)
     second_row[1].metric("Fees paid", pln(summary.total_fees), border=True)
     payoff_column_index = 3 if include_subsidy else 2
     if include_subsidy:

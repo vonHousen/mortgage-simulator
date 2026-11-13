@@ -33,6 +33,9 @@ def compare(results: Sequence[SimulationResult]) -> ComparisonReport:
         ScenarioComparison(
             scenario_name=result.scenario_name,
             summary=result.summary,
+            net_investment_earnings=result.investment.net_earnings if result.investment else ZERO,
+            retained_surplus=result.investment.retained_surplus if result.investment else ZERO,
+            net_financing_cost_delta=result.net_financing_cost - results[0].net_financing_cost,
             cash_outflow_delta=result.summary.total_cash_outflow - baseline.total_cash_outflow,
             interest_delta=result.summary.total_interest - baseline.total_interest,
             ending_balance_delta=result.summary.ending_balance - baseline.ending_balance,
@@ -66,6 +69,10 @@ def comparison_frame(report: ComparisonReport, *, include_subsidy: bool = True) 
     rows = [
         {
             "scenario": scenario.scenario_name,
+            "net_financing_cost": scenario.net_financing_cost,
+            "net_investment_earnings": scenario.net_investment_earnings,
+            "retained_surplus": scenario.retained_surplus,
+            "net_financing_cost_delta": scenario.net_financing_cost_delta,
             "total_principal": scenario.summary.total_principal,
             "principal_repaid_before_horizon_settlement": (scenario.summary.principal_repaid_before_horizon_settlement),
             "horizon_settlement": scenario.summary.horizon_settlement,

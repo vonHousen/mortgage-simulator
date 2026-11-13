@@ -249,7 +249,7 @@ class TestCharts:
         first_month = {row["component"]: row["amount"] for row in rows if row["month"] == 1}
         assert "Subsidy" not in first_month
         assert "Interest after subsidy" not in first_month
-        assert first_month["Gross interest"] == pytest.approx(float(baseline_month["interest"]))
+        assert first_month["Gross mortgage interest"] == pytest.approx(float(baseline_month["interest"]))
         _assert_composition_interaction(specification)
 
     def test_composition_chart_when_terminal_payment_hidden_expect_component_omitted(self) -> None:

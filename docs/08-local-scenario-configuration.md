@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The Streamlit application can seed recurring overpayments and lump sums from an optional, untracked JSON file. Loaded
+The Streamlit application can seed recurring overpayments, lump sums, and optional investments from an optional, untracked JSON file. Loaded
 values initialize a new browser session and remain editable; the application never writes UI changes back to disk.
 
 Mortgage assumptions and the baseline name remain environment-backed application settings. Scenario JSON does not
@@ -46,3 +46,51 @@ The chart-focus setting initializes a shared session toggle used on Results and 
 user's selection. Focused charts reduce the visual effect of unusually large payments while retaining exact values in
 tooltips, calculations, reports, tables, totals, and CSV exports. The current projection rules live in
 [`mortgage_charts.py`](../src/mortgage_simulator/reporting/mortgage_charts.py).
+
+## Deposit-funded overpayments
+
+A custom scenario can contain an optional `investment` object. Its validated fields are defined by
+`DepositInvestment` in the simulation models. For example:
+
+```json
+{
+  "scenarios": [{
+    "name": "Invest then overpay",
+    "investment": {
+      "initial_amount": "100000.00",
+      "start_month": 1,
+      "annual_rate": "0.06",
+      "term_months": 3,
+      "mode": "manual",
+      "term_count": 2
+    }
+  }]
+}
+```
+
+This example renews a three-month deposit once and pays its full net balance toward the mortgage in month 7.
+Rates in JSON are decimal fractions; the UI displays percentages. For automatic optimization, set `mode` to
+`automatic` and omit `term_count`. Manual zero terms means immediate overpayment.
+
+Interest is simple within each term, including multi-year terms, and is credited only at maturity. Gross deposit
+interest is rounded half-up to grosze; the taxable base and 19% tax are rounded upward to grosze. Renewals reinvest
+principal plus net interest at the same assumed annual rate. This is an analytical fixed-rate deposit model, not
+replication of a specific bank's daily accrual convention.
+
+Automatic mode minimizes **Net financing cost = Total mortgage cost − Net investment earnings**, then prefers the
+earliest completion month and fewest terms. Mortgage cost and investment earnings remain visible separately. Retained
+surplus is not deducted again. Candidates stop at full-term maturities inside the analysis horizon. When horizon settlement is disabled, inspect ending debt alongside
+costs because the analysis is partial-horizon.
+
+The mortgage caps the investment-funded payment at remaining debt after existing payments and before horizon
+settlement. Surplus remains yours. If other payments clear the mortgage, the current deposit term finishes but
+never renews again; if payoff precedes deposit opening, the original capital remains uninvested.
+
+On Overpayment scenarios, use **Invest before overpaying** to add, edit, or remove investments. Apply or cancel
+pending edits before Run simulation. Results display the maturity ledger, retained surplus, and candidate comparison,
+with separate investment CSV downloads. JSON seeds a fresh session; changing the file does not replace an existing
+session's edits.
+
+See [Invest before overpaying](09-invest-before-overpaying.md) for use cases and worked deposit examples.
+
+See [Understanding the metrics](10-understanding-metrics.md) for payment, cost, earnings, and surplus definitions.

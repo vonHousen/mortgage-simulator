@@ -45,7 +45,7 @@ class TestTableConfiguration:
         assert principal_config["label"] == "Principal"
         assert recurring_config["label"] == "Recur. overpayment"
         assert settlement_config["label"] == "Horizon settlement"
-        assert interest_config["label"] == "Interest"
+        assert interest_config["label"] == "Gross mortgage interest"
         assert fee_free_config["label"] == "Outflow excl. fees"
         assert outflow_config["label"] == "Outflow"
         assert closing_config["label"] == "Closing balance"

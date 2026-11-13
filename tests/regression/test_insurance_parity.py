@@ -15,7 +15,7 @@ from mortgage_simulator.reference_data.regression_manifest_loader import (
     load_insurance_regression_manifest,
 )
 from mortgage_simulator.simulation.models import InsuranceCalculationMethod
-from mortgage_simulator.simulation.monthly_insurance import calculate_monthly_insurance
+from mortgage_simulator.simulation.mortgage.insurance import calculate_monthly_insurance
 
 REFERENCE_CSV = Path("data/monthly-insurance-values.csv")
 REFERENCE_MANIFEST = Path("data/regression/insurance.json")

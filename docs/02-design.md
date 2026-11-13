@@ -34,7 +34,8 @@ prevents startup. Scenario JSON never overrides mortgage settings or the baselin
 
 ### Logic
 
-[`simulation/engine.py`](../src/mortgage_simulator/simulation/engine.py) owns the financial model and operates on
+[`simulation/engine.py`](../src/mortgage_simulator/simulation/engine.py) coordinates scenario evaluation. The shared mortgage calculator in
+[`simulation/mortgage/schedule.py`](../src/mortgage_simulator/simulation/mortgage/schedule.py) operates on
 `Decimal` values. The `simulation` package must not import Streamlit, Polars, Altair, openpyxl, or environment
 configuration. It produces immutable typed monthly records and summaries.
 
@@ -68,7 +69,7 @@ duplicate domain formulas.
 The calculation boundary is `simulate`, defined in
 [`simulation/engine.py`](../src/mortgage_simulator/simulation/engine.py).
 
-The baseline uses an `OverpaymentScenario` with no recurring or lump-sum payments. Calling the same function for every scenario prevents separate baseline and overpayment code paths.
+The baseline uses an `OverpaymentScenario` with no recurring payments, lump sums, or investment. Calling the same function for every scenario prevents separate baseline and overpayment code paths.
 
 The reporting boundary is `compare`, defined in
 [`reporting/scenario_comparison.py`](../src/mortgage_simulator/reporting/scenario_comparison.py).
@@ -79,14 +80,23 @@ Core input types:
 - `SubsidyTerms`: subsidy enablement, required first-period `coefficient`, required `second_coefficient`, and shared
   subsidized reference rate.
 - `OverpaymentScenario`: unique name, either an optional fixed recurring amount or cash-outflow target with a start
-  month, and zero or more lump sums.
+  month, zero or more lump sums, and an optional `DepositInvestment`.
 - `LumpSum`: payment month and amount.
+
+`DepositInvestment` describes capital, start month, annual gross rate, term length, and manual or automatic timing.
+Automatic investment timing uses exhaustive search over all full-term maturities inside the horizon, including
+immediate overpayment, minimizing Net financing cost with completion-month and term-count tie-breaks.
+The investment package evaluates deposit-funded balloon repayments through the same mortgage calculator; the mortgage
+package contains no deposit calculations. Net financing cost equals Total mortgage cost minus Net investment earnings;
+see [Understanding the metrics](10-understanding-metrics.md) and [ADR 0010](adr/0010-use-net-financing-cost-for-investment-timing.md).
+See [the investment guide](09-invest-before-overpaying.md) for configuration and timing behavior.
 
 Core result types:
 
 - `MonthlyPayment`: month, exact payment date, opening balance, scheduled principal, recurring overpayment, lump sum, horizon settlement, interest, subsidy, monthly insurance, monthly fixed fees, annual fixed fee, aggregate fees, total cash outflow, and closing balance.
 - `SimulationSummary`: totals, principal repaid before settlement, horizon settlement, ending balance, and optional payoff month.
-- `SimulationResult`: scenario identity, ordered payments, and summary.
+- `SimulationResult`: scenario identity, ordered payments, summary, optional investment summary and candidates, and derived Net financing cost.
+- `DepositTerm`, `InvestmentSummary`, and `InvestmentCandidate`: maturity ledger, earnings and funds disposition, and timing alternatives.
 - `ComparisonReport`: all scenario summaries and deltas from the baseline.
 
 The validated inputs and result records live in `simulation/models.py`; `simulate` lives in `simulation/engine.py`;
@@ -116,6 +126,8 @@ For month `m`:
 8. In the final horizon month, when horizon settlement is enabled, apply the exact remaining balance as a distinct terminal principal payment.
 9. Calculate cash outflow and closing balance.
 10. Stop after payoff or the configured analysis horizon, whichever occurs first.
+
+Investment evaluation appends the deposit-funded balloon after existing lump sums, so it is applied before horizon settlement.
 
 The scheduled monthly principal is `initial principal ÷ contractual term in months` because the workbook uses equal-principal installments.
 
@@ -220,18 +232,23 @@ W inputs side by side, with the shared reference rate below. Initial selections 
 A scenario editor supports multiple named scenarios with `name`, `strategy`, `recurring_value`, and `start_month`
 fields. Each row chooses either Fixed overpayment or Constant cash outflow. A second editor assigns optional lump sums
 by scenario and month. New sessions initialize both editors from optional local scenario defaults; later UI edits take
-precedence for that session and are not written back to disk. Submitting the form validates the entire run and then
+precedence for that session and are not written back to disk. A dedicated **Invest before overpaying** section attaches
+one deposit to a custom scenario using Add, Edit, Remove, Apply, and Cancel controls. Pending investment edits must
+be applied or cancelled before simulation. Submitting the form validates the entire run and then
 calculates the baseline and all custom scenarios.
 
 The results contain:
 
-- summary metrics for cash outflow, principal, interest, subsidy, fees, ending balance, and payoff month;
+- summary metrics for Total mortgage payments, Principal repaid, Gross mortgage interest, subsidy, fees, Ending balance, and payoff month;
+- a Cost indicators leading row with Net financing cost as the primary decision metric, followed by Total mortgage cost and Net investment earnings;
+- supporting ratios and annualized-rate indicators below, with formula-based tooltips explaining their different purposes;
 - conditional horizon-settlement indicators for principal repaid before settlement, the terminal amount, its share of original principal, and its reduction from the baseline;
 - absolute and percentage deltas from the baseline;
 - remaining-principal and monthly-cash-outflow comparison charts;
 - a principal, horizon-settlement, interest, subsidy, and fee composition chart;
 - a scenario-filtered monthly schedule;
-- one combined CSV with a scenario column;
+- one combined mortgage CSV with a scenario column;
+- investment earnings, applied repayment, retained surplus, maturity ledger, and automatic timing candidates with separate CSV downloads;
 - an assumptions panel and non-advice statement.
 
 Results and Comparison share a `Focus on typical payments` session toggle initialized from application settings. On
@@ -241,7 +258,7 @@ visibility first. Cash outflow uses the nearest-value 99th percentile across eve
 y-axis ceiling, while composition uses the percentile of the selected scenario's monthly visible stack totals. Larger
 marks are clamped to that edge while exact tooltip amounts and all non-chart outputs remain unchanged.
 
-When subsidy is disabled, results use gross-interest terminology and omit subsidy metrics, comparison rows, chart
+When subsidy is disabled, results use Gross mortgage interest terminology and omit subsidy metrics, comparison rows, chart
 components, schedule columns, and CSV fields. Internal typed results retain zero-valued subsidy fields so calculation
 and comparison schemas remain stable.
 

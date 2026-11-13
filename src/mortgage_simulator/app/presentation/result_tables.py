@@ -8,7 +8,14 @@ from typing import Any
 import polars as pl
 import streamlit as st
 
-from mortgage_simulator.app.presentation.result_metrics import payoff_label, percentage, percentage_or_na, pln
+from mortgage_simulator.app.presentation.result_metrics import (
+    MORTGAGE_COST_HELP,
+    MORTGAGE_PAYMENTS_HELP,
+    payoff_label,
+    percentage,
+    percentage_or_na,
+    pln,
+)
 from mortgage_simulator.simulation.models import ComparisonReport, ScenarioComparison
 
 PLN_TABLE_FORMAT = "%,.2f PLN"
@@ -77,7 +84,7 @@ SCHEDULE_COLUMN_CONFIG: dict[str, Any] = {
     "recurring_overpayment": st.column_config.NumberColumn("Recur. overpayment", format=PLN_TABLE_FORMAT),
     "lump_sum": st.column_config.NumberColumn("Lump sum", format=PLN_TABLE_FORMAT),
     "horizon_settlement": st.column_config.NumberColumn("Horizon settlement", format=PLN_TABLE_FORMAT),
-    "interest": st.column_config.NumberColumn("Interest", format=PLN_TABLE_FORMAT),
+    "interest": st.column_config.NumberColumn("Gross mortgage interest", format=PLN_TABLE_FORMAT),
     "subsidy": st.column_config.NumberColumn("Subsidy", format=PLN_TABLE_FORMAT),
     "monthly_insurance": st.column_config.NumberColumn("Monthly insurance", format=PLN_TABLE_FORMAT),
     "monthly_fixed_fees": st.column_config.NumberColumn("Monthly fixed fees", format=PLN_TABLE_FORMAT),
@@ -94,11 +101,15 @@ COMPARISON_COLUMN_CONFIG: dict[str, Any] = {
         "Principal before settlement", format=PLN_TABLE_FORMAT
     ),
     "horizon_settlement": st.column_config.NumberColumn("Horizon settlement", format=PLN_TABLE_FORMAT),
-    "total_interest": st.column_config.NumberColumn("Gross interest", format=PLN_TABLE_FORMAT),
+    "total_interest": st.column_config.NumberColumn("Gross mortgage interest", format=PLN_TABLE_FORMAT),
     "total_subsidy": st.column_config.NumberColumn("Subsidy received", format=PLN_TABLE_FORMAT),
     "total_fees": st.column_config.NumberColumn("Fees paid", format=PLN_TABLE_FORMAT),
-    "total_cash_outflow": st.column_config.NumberColumn("Total cash outflow", format=PLN_TABLE_FORMAT),
-    "total_mortgage_cost": st.column_config.NumberColumn("Total mortgage cost", format=PLN_TABLE_FORMAT),
+    "total_cash_outflow": st.column_config.NumberColumn(
+        "Total mortgage payments", format=PLN_TABLE_FORMAT, help=MORTGAGE_PAYMENTS_HELP
+    ),
+    "total_mortgage_cost": st.column_config.NumberColumn(
+        "Total mortgage cost", format=PLN_TABLE_FORMAT, help=MORTGAGE_COST_HELP
+    ),
     "mortgage_cost_to_original_principal": st.column_config.NumberColumn(
         "Cost / original principal", format=PERCENT_TABLE_FORMAT
     ),
@@ -110,7 +121,7 @@ COMPARISON_COLUMN_CONFIG: dict[str, Any] = {
     ),
     "ending_balance": st.column_config.NumberColumn("Ending balance", format=PLN_TABLE_FORMAT),
     "payoff_month": st.column_config.NumberColumn("Payoff month", format="%d"),
-    "cash_outflow_delta": st.column_config.NumberColumn("Cash outflow difference", format=PLN_TABLE_FORMAT),
+    "cash_outflow_delta": st.column_config.NumberColumn("Mortgage payments difference", format=PLN_TABLE_FORMAT),
     "interest_delta": st.column_config.NumberColumn("Interest difference", format=PLN_TABLE_FORMAT),
     "ending_balance_delta": st.column_config.NumberColumn("Ending balance difference", format=PLN_TABLE_FORMAT),
     "mortgage_cost_delta": st.column_config.NumberColumn("Total mortgage cost difference", format=PLN_TABLE_FORMAT),
@@ -182,20 +193,24 @@ def _comparison_metric_label(label: str, include_subsidy: bool) -> str:
 
 
 _COMPARISON_METRICS = (
+    _ComparisonMetric("Net financing cost", lambda scenario: pln(scenario.net_financing_cost)),
+    _ComparisonMetric("Net investment earnings", lambda scenario: pln(scenario.net_investment_earnings)),
+    _ComparisonMetric("Retained surplus", lambda scenario: pln(scenario.retained_surplus)),
+    _ComparisonMetric("Net financing cost difference", lambda scenario: pln(scenario.net_financing_cost_delta)),
     _ComparisonMetric("Principal repaid", lambda scenario: pln(scenario.summary.total_principal)),
     _ComparisonMetric(
         "Principal before settlement",
         lambda scenario: pln(scenario.summary.principal_repaid_before_horizon_settlement),
     ),
     _ComparisonMetric("Horizon settlement", lambda scenario: pln(scenario.summary.horizon_settlement)),
-    _ComparisonMetric("Gross interest", lambda scenario: pln(scenario.summary.total_interest)),
+    _ComparisonMetric("Gross mortgage interest", lambda scenario: pln(scenario.summary.total_interest)),
     _ComparisonMetric(
         "Subsidy received",
         lambda scenario: pln(scenario.summary.total_subsidy),
         subsidy_metric=True,
     ),
     _ComparisonMetric("Fees paid", lambda scenario: pln(scenario.summary.total_fees)),
-    _ComparisonMetric("Total cash outflow", lambda scenario: pln(scenario.summary.total_cash_outflow)),
+    _ComparisonMetric("Total mortgage payments", lambda scenario: pln(scenario.summary.total_cash_outflow)),
     _ComparisonMetric("Total mortgage cost", lambda scenario: pln(scenario.summary.total_mortgage_cost)),
     _ComparisonMetric(
         "Cost / original principal",
@@ -215,7 +230,7 @@ _COMPARISON_METRICS = (
         ending_balance_metric=True,
     ),
     _ComparisonMetric("Payoff month", lambda scenario: payoff_label(scenario.summary.payoff_month)),
-    _ComparisonMetric("Cash outflow difference", lambda scenario: pln(scenario.cash_outflow_delta)),
+    _ComparisonMetric("Mortgage payments difference", lambda scenario: pln(scenario.cash_outflow_delta)),
     _ComparisonMetric("Interest difference", lambda scenario: pln(scenario.interest_delta)),
     _ComparisonMetric(
         "Ending balance difference",

@@ -22,7 +22,7 @@ the complete period; principal changes follow the interest calculation. Values r
 
 The monthly subsidy remains a separate one-twelfth calculation. Equal-month interest remains isolated for Excel
 parity and continues to use annual rate divided by 12. The authoritative implementation lives in
-[`simulation/engine.py`](../../src/mortgage_simulator/simulation/engine.py), while the private artifact identity,
+[`mortgage/calendar.py`](../../src/mortgage_simulator/simulation/mortgage/calendar.py), while the private artifact identity,
 fixture assumptions, comparisons, and exclusions are enforced by
 [`test_calendar_parity.py`](../../tests/regression/test_calendar_parity.py).
 

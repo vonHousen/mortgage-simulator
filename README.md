@@ -9,6 +9,8 @@ The Streamlit workflow lets you:
 
 - configure shared mortgage terms, rates, subsidy behavior, fees, and the analysis horizon;
 - compare a no-overpayment baseline with fixed overpayments, constant-cash-outflow strategies, and lump sums;
+- compare immediate overpayment with a fixed-rate deposit followed by a mortgage repayment;
+- compare Net financing cost (Total mortgage cost minus Net investment earnings), with mortgage charges and deposit earnings shown separately;
 - inspect scenario totals, baseline-relative differences, payoff timing, charts, and monthly schedules;
 - download all calculated schedules as a combined CSV.
 
@@ -87,8 +89,9 @@ src/mortgage_simulator/
 │   └── regression_manifest_loader.py   # Development-only private manifest schemas
 ├── simulation/
 │   ├── models.py                       # Validated inputs and immutable simulation results
-│   ├── engine.py                       # Mortgage schedule calculation
-│   └── monthly_insurance.py            # Selectable monthly-insurance calculations
+│   ├── engine.py                       # Scenario orchestration
+│   ├── mortgage/                       # Schedules, payments, calendar, insurance, and summaries
+│   └── investment/                     # Deposit growth and repayment timing evaluation
 ├── reporting/
 │   ├── scenario_comparison.py          # Baseline-relative summaries and comparison frames
 │   ├── payment_schedules.py            # Schedule frames and CSV serialization
@@ -106,6 +109,10 @@ Dependencies flow from `simulation` to `reporting` to `app`. The simulation pack
 reporting tools, environment configuration, and local reference files. The maintained architectural boundaries and
 public calculation interfaces are described in the [V1 design](docs/02-design.md) and
 [source-organization ADR](docs/adr/0006-organize-source-by-responsibility.md).
+
+See [Invest before overpaying](docs/09-invest-before-overpaying.md) for use cases, worked examples, and configuration.
+[Understanding the metrics](docs/10-understanding-metrics.md) explains Net financing cost, Total mortgage payments,
+and why principal repayments and financing charges are distinguished.
 
 ## Documentation
 

@@ -14,8 +14,9 @@ period interest = principal × annual rate × sum(days in each calendar-year seg
 
 The engine retains full `Decimal` precision and does not round daily or monthly interest. The implemented segmentation,
 year handling, and schedule construction live in
-[`simulation/engine.py`](../src/mortgage_simulator/simulation/engine.py), with edge cases covered by
-[`test_engine.py`](../tests/simulation/test_engine.py).
+[`mortgage/calendar.py`](../src/mortgage_simulator/simulation/mortgage/calendar.py) and
+[`mortgage/schedule.py`](../src/mortgage_simulator/simulation/mortgage/schedule.py), with edge cases covered by
+[`test_schedule.py`](../tests/simulation/mortgage/test_schedule.py).
 
 ## Interest-period boundaries
 
@@ -32,7 +33,7 @@ payment dates would require a separate model rather than an implicit adjustment 
 The optional subsidy remains a separate monthly calculation; it does not change with the number of calendar days in
 the interest period. Equal-month interest remains available as an explicit alternative for workbook parity. The
 authoritative calculation order and formulas are implemented in
-[`simulation/engine.py`](../src/mortgage_simulator/simulation/engine.py).
+[`simulation/mortgage/schedule.py`](../src/mortgage_simulator/simulation/mortgage/schedule.py).
 
 The reviewed payment-date behavior is protected by the local suite described in
 [Calendar-day mortgage regression testing](06-calendar-regression-testing.md).

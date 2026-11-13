@@ -116,6 +116,76 @@ class LumpSum(FrozenModel):
     amount: Decimal = Field(gt=ZERO)
 
 
+class InvestmentMode(StrEnum):
+    """Deposit repayment selection mode."""
+
+    MANUAL = "manual"
+    AUTOMATIC = "automatic"
+
+
+class DepositInvestment(FrozenModel):
+    """Fixed-rate deposit funded on a mortgage payment date."""
+
+    initial_amount: Decimal = Field(gt=ZERO, decimal_places=2)
+    start_month: int = Field(ge=1)
+    annual_rate: Decimal = Field(ge=ZERO)
+    term_months: int = Field(gt=0)
+    mode: InvestmentMode = InvestmentMode.MANUAL
+    term_count: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def validate_mode(self) -> Self:
+        """Require a term count only for manual selection."""
+        if self.mode == InvestmentMode.MANUAL and self.term_count is None:
+            raise ValueError("manual investment requires a term count")
+        if self.mode == InvestmentMode.AUTOMATIC and self.term_count is not None:
+            raise ValueError("automatic investment must not specify a term count")
+        return self
+
+
+class DepositTerm(FrozenModel):
+    """Credited interest and tax at one deposit maturity."""
+
+    maturity_month: int
+    opening_balance: Decimal
+    gross_interest: Decimal
+    tax: Decimal
+    closing_balance: Decimal
+
+
+class InvestmentSummary(FrozenModel):
+    """Investment funding and disposition, separate from mortgage costs."""
+
+    planned_term_count: int
+    completion_month: int
+    gross_interest: Decimal
+    tax: Decimal
+    net_earnings: Decimal
+    applied_repayment: Decimal
+    retained_surplus: Decimal
+    terms: tuple[DepositTerm, ...]
+
+
+def calculate_net_financing_cost(mortgage_cost: Decimal, net_earnings: Decimal) -> Decimal:
+    """Subtract net deposit earnings from mortgage financing charges."""
+    return mortgage_cost - net_earnings
+
+
+class InvestmentCandidate(FrozenModel):
+    """Mortgage-cost objective and investment outcome for one candidate."""
+
+    term_count: int
+    repayment_month: int
+    total_mortgage_cost: Decimal
+    ending_balance: Decimal
+    investment: InvestmentSummary
+
+    @property
+    def net_financing_cost(self) -> Decimal:
+        """Return mortgage cost minus net investment earnings."""
+        return calculate_net_financing_cost(self.total_mortgage_cost, self.investment.net_earnings)
+
+
 class OverpaymentScenario(FrozenModel):
     """Recurring and one-off overpayments for one simulation."""
 
@@ -124,6 +194,7 @@ class OverpaymentScenario(FrozenModel):
     cash_outflow_target: Decimal = Field(default=ZERO, ge=ZERO)
     recurring_start_month: int | None = Field(default=None, ge=1)
     lump_sums: tuple[LumpSum, ...] = ()
+    investment: DepositInvestment | None = None
 
     @model_validator(mode="after")
     def validate_recurring_payment(self) -> Self:
@@ -151,6 +222,11 @@ class SimulationRequest(FrozenModel):
         if len(names) != len(set(names)):
             raise ValueError("scenario names must be unique")
         for scenario in self.scenarios:
+            investment = scenario.investment
+            if investment is not None:
+                maturity = investment.start_month + (investment.term_count or 0) * investment.term_months
+                if maturity > self.terms.analysis_horizon_months:
+                    raise ValueError("investment start and maturity must be within the analysis horizon")
             if (
                 scenario.recurring_start_month is not None
                 and scenario.recurring_start_month > self.terms.analysis_horizon_months
@@ -206,6 +282,15 @@ class SimulationResult(FrozenModel):
     scenario_name: str
     payments: tuple[MonthlyPayment, ...]
     summary: SimulationSummary
+    investment: InvestmentSummary | None = None
+    investment_candidates: tuple[InvestmentCandidate, ...] = ()
+
+    @property
+    def net_financing_cost(self) -> Decimal:
+        """Return mortgage cost minus net investment earnings, if present."""
+        return calculate_net_financing_cost(
+            self.summary.total_mortgage_cost, self.investment.net_earnings if self.investment else ZERO
+        )
 
 
 class ScenarioComparison(FrozenModel):
@@ -213,6 +298,15 @@ class ScenarioComparison(FrozenModel):
 
     scenario_name: str
     summary: SimulationSummary
+    net_investment_earnings: Decimal = ZERO
+    retained_surplus: Decimal = ZERO
+    net_financing_cost_delta: Decimal = ZERO
+
+    @property
+    def net_financing_cost(self) -> Decimal:
+        """Return mortgage cost minus net investment earnings."""
+        return calculate_net_financing_cost(self.summary.total_mortgage_cost, self.net_investment_earnings)
+
     cash_outflow_delta: Decimal
     interest_delta: Decimal
     ending_balance_delta: Decimal

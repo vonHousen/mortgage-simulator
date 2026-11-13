@@ -5,6 +5,7 @@ from decimal import InvalidOperation
 import streamlit as st
 from pydantic import ValidationError
 
+from mortgage_simulator.app.investment_controls import get_investments, render_investment_controls
 from mortgage_simulator.app.session_state import (
     LUMP_SUMS_KEY,
     SCENARIOS_KEY,
@@ -18,7 +19,7 @@ from mortgage_simulator.settings import AppSettings
 from mortgage_simulator.simulation.engine import simulate
 
 st.title("Overpayment scenarios")
-st.caption("Compare recurring strategies and optional one-off payments with the Baseline.")
+st.caption("Compare recurring strategies, one-off payments, and investing before overpaying with the Baseline.")
 terms = get_terms()
 interest_label = "net interest" if terms.subsidy.enabled else "gross interest"
 
@@ -40,7 +41,11 @@ with st.container(border=True):
 
 with st.container(border=True):
     st.subheader("One-off lump sums")
-    st.caption("Assign each payment to one of the scenario names above.")
+    st.caption(
+        "Assign each payment to one of the scenario names above. "
+        "Deposit proceeds become a separate balloon automatically; "
+        "do not enter the same investment capital here as well."
+    )
     lump_sum_data = st.data_editor(
         get_lump_sum_data(),
         column_config=lump_sum_column_config(get_terms().analysis_horizon_months),
@@ -50,7 +55,11 @@ with st.container(border=True):
         key="lump_sum_editor",
     )
 
-if st.button("Run simulation", type="primary", icon=":material/play_arrow:"):
+pending_investment = render_investment_controls(scenario_data.get_column("name").to_list(), terms)
+if pending_investment:
+    st.caption("Apply or cancel investment edits and resolve scenario references before running.")
+
+if st.button("Run simulation", type="primary", icon=":material/play_arrow:", disabled=pending_investment):
     st.session_state[SCENARIOS_KEY] = scenario_data
     st.session_state[LUMP_SUMS_KEY] = lump_sum_data
     try:
@@ -60,7 +69,11 @@ if st.button("Run simulation", type="primary", icon=":material/play_arrow:"):
             scenario_data,  # ty: ignore[invalid-argument-type]  # Streamlit misidentifies Polars frames.
             lump_sum_data,  # ty: ignore[invalid-argument-type]  # Streamlit misidentifies Polars frames.
         )
-        results = tuple(simulate(request.terms, scenario) for scenario in request.scenarios)
+        scenarios = tuple(
+            scenario.model_copy(update={"investment": get_investments().get(scenario.name)})
+            for scenario in request.scenarios
+        )
+        results = tuple(simulate(request.terms, scenario) for scenario in scenarios)
     except (InvalidOperation, KeyError, TypeError, ValueError, ValidationError) as error:
         st.error(f"Invalid simulation input: {error}", icon=":material/error:")
     else:

@@ -10,6 +10,10 @@ architecture decisions for Mortgage Simulator. Start with the [root README](../R
 | [Project brief](01-project-brief.md) | Explains the problem, intended audience, product direction, and principles. |
 | [V1 design](02-design.md) | Defines the implemented architecture, calculation behavior, interfaces, and UI workflow. |
 
+[Invest before overpaying](09-invest-before-overpaying.md) explains deposit-funded repayments, the UI workflow,
+manual and automatic timing, and worked examples. [Understanding the metrics](10-understanding-metrics.md) explains
+the primary decision metric, payment versus cost, and the relationship between mortgage charges and deposit earnings.
+
 ## Model and evidence
 
 | Document | Purpose |
@@ -53,3 +57,4 @@ defaults, source precedence, and validation. Authoritative setting names and def
 | [0007](adr/0007-adopt-ty-alongside-mypy.md) | Superseded in part by 0009 | Run ty alongside strict mypy checking. |
 | [0008](adr/0008-centralize-environment-configuration.md) | Accepted | Centralize environment configuration under a grouped settings model. |
 | [0009](adr/0009-share-pre-commit-checks-with-ci.md) | Accepted | Share pre-commit checks with local and hosted CI; run only ty before commits and both type checkers in CI. |
+| [0010](adr/0010-use-net-financing-cost-for-investment-timing.md) | Accepted | Use Net financing cost as the primary comparison metric and automatic investment timing objective. |

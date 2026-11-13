@@ -6,13 +6,13 @@ from mortgage_simulator.app.presentation.result_metrics import (
     additional_cash_paid,
     balance_reduction,
     interest_saved,
+    net_financing_cost_saved,
     payoff_label,
     percentage,
     percentage_or_na,
     percentage_points,
     pln,
     settlement_reduction,
-    total_mortgage_cost_saved,
 )
 from mortgage_simulator.simulation.models import ScenarioComparison, SimulationSummary
 
@@ -73,13 +73,15 @@ class TestDecisionDeltas:
         # Act / Assert
         assert interest_saved(selected) == Decimal("52323.75")
 
-    def test_mortgage_cost_saved_when_cost_delta_is_negative_expect_positive_saving(self) -> None:
-        """Present a total mortgage cost reduction as a positive saving."""
+    def test_net_financing_cost_saved_when_mortgage_cost_rises_expect_net_saving(self) -> None:
+        """Use combined cost even when mortgage-only cost increases."""
         # Arrange
-        selected = _scenario_comparison(mortgage_cost_delta=Decimal("-20825.25"))
+        selected = _scenario_comparison(mortgage_cost_delta=Decimal("1000")).model_copy(
+            update={"net_financing_cost_delta": Decimal("-20825.25")}
+        )
 
         # Act / Assert
-        assert total_mortgage_cost_saved(selected) == Decimal("20825.25")
+        assert net_financing_cost_saved(selected) == Decimal("20825.25")
 
     def test_balance_reduction_when_balance_delta_is_negative_expect_positive_reduction(self) -> None:
         """Present a lower ending balance as a positive reduction."""

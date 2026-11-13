@@ -5,6 +5,7 @@ from decimal import Decimal
 from mortgage_simulator.reporting.scenario_comparison import compare, comparison_frame
 from mortgage_simulator.simulation.engine import simulate
 from mortgage_simulator.simulation.models import (
+    DepositInvestment,
     OverpaymentScenario,
     SimulationResult,
 )
@@ -73,6 +74,23 @@ class TestCompare:
         ratio = report.scenarios[1].mortgage_cost_savings_to_overpayment_ratio
         assert applied_overpayment < configured_overpayment
         assert ratio == expected_ratio
+
+    def test_compare_when_investment_present_expect_net_cost_and_surplus(self) -> None:
+        # Arrange
+        terms = default_mortgage_terms()
+        baseline = simulate(terms, OverpaymentScenario(name="Baseline"))
+        investment = DepositInvestment(
+            initial_amount=Decimal("10000"), start_month=1, annual_rate=Decimal("0.10"), term_months=12, term_count=1
+        )
+        result = simulate(terms, OverpaymentScenario(name="Deposit", investment=investment))
+        # Act
+        comparison = compare([baseline, result]).scenarios[1]
+        # Assert
+        assert result.investment is not None
+        assert comparison.net_investment_earnings == Decimal("810")
+        assert comparison.retained_surplus == result.investment.retained_surplus
+        assert comparison.net_financing_cost == result.summary.total_mortgage_cost - Decimal("810")
+        assert comparison.net_financing_cost_delta == result.net_financing_cost - baseline.net_financing_cost
 
 
 class TestComparisonFrame:

@@ -23,7 +23,10 @@ detailed results over generalized financial guidance.
 
 The first version translates the workbook's intentional behavior into an interactive Streamlit application. It
 compares a no-overpayment baseline with configurable recurring and lump-sum overpayments over a selected analysis
-horizon. It can also settle principal remaining after the final regular horizon payment so scenarios can be compared
+horizon. Scenarios can also invest available capital in a fixed-rate deposit, renew it after tax, and apply the
+net balance as a later mortgage repayment. Net financing cost combines mortgage charges and net investment earnings
+as the primary comparison metric; [Understanding the metrics](10-understanding-metrics.md) explains the distinction. See [Invest before overpaying](09-invest-before-overpaying.md).
+It can also settle principal remaining after the final regular horizon payment so scenarios can be compared
 with identical principal repayment; users can disable this option for partial-horizon and workbook-parity analysis.
 
 Later versions may replace spreadsheet assumptions with independently researched current rules and extend the analysis beyond the subsidy period. That work is separate because real-world rules may change the model rather than merely add features.

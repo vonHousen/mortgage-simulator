@@ -31,6 +31,22 @@ st.altair_chart(
     width="stretch",
 )
 st.subheader("Scenario totals and differences")
+st.caption(
+    "Net financing cost = Total mortgage cost - Net investment earnings. Lower is better; "
+    "differences are scenario minus Baseline."
+)
+st.caption(
+    "Total mortgage cost = Gross mortgage interest - Subsidy received + Fees paid. Total "
+    "mortgage payments add Principal repaid and include deposit-funded payments, not just "
+    "your own contributions."
+)
+st.caption(
+    "Net investment earnings = Gross deposit interest - Deposit tax. Earnings are counted once in Net financing cost."
+)
+st.caption(
+    "Retained surplus = Final deposit balance - Applied to mortgage. It includes capital "
+    "and earnings; do not deduct it again from Net financing cost."
+)
 st.dataframe(
     comparison_table_frame(
         compare(results),

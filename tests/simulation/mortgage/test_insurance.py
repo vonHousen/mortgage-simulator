@@ -12,7 +12,7 @@ class TestCalculateMonthlyInsurance:
     def test_calculate_when_opening_balance_selected_expect_current_balance_charge(self) -> None:
         """Apply the monthly rate to the current opening balance."""
         # Arrange
-        calculator = import_module("mortgage_simulator.simulation.monthly_insurance").calculate_monthly_insurance
+        calculator = import_module("mortgage_simulator.simulation.mortgage.insurance").calculate_monthly_insurance
         current_balance = Decimal("9900")
         rate = Decimal("0.0005")
 
@@ -32,7 +32,7 @@ class TestCalculateMonthlyInsurance:
     def test_calculate_when_midpoint_selected_expect_average_balance_charge(self) -> None:
         """Apply the monthly rate to the arithmetic mean of adjacent balances."""
         # Arrange
-        calculator = import_module("mortgage_simulator.simulation.monthly_insurance").calculate_monthly_insurance
+        calculator = import_module("mortgage_simulator.simulation.mortgage.insurance").calculate_monthly_insurance
         previous_balance = Decimal("10000")
         current_balance = Decimal("9900")
         rate = Decimal("0.0005")
@@ -53,7 +53,7 @@ class TestCalculateMonthlyInsurance:
     def test_calculate_when_weighted_selected_expect_opposite_interval_weights(self) -> None:
         """Weight each adjacent balance by the opposite payment interval."""
         # Arrange
-        calculator = import_module("mortgage_simulator.simulation.monthly_insurance").calculate_monthly_insurance
+        calculator = import_module("mortgage_simulator.simulation.mortgage.insurance").calculate_monthly_insurance
         previous_balance = Decimal("10000")
         current_balance = Decimal("9900")
         previous_days = 29
@@ -79,7 +79,7 @@ class TestCalculateMonthlyInsurance:
     def test_calculate_when_balances_match_expect_all_methods_to_match(self) -> None:
         """Produce the same first-month charge when adjacent balances match."""
         # Arrange
-        calculator = import_module("mortgage_simulator.simulation.monthly_insurance").calculate_monthly_insurance
+        calculator = import_module("mortgage_simulator.simulation.mortgage.insurance").calculate_monthly_insurance
         balance = Decimal("10000")
         rate = Decimal("0.0005")
 
