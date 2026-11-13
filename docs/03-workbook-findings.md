@@ -24,7 +24,7 @@ The workbook established the main V1 behaviors:
 The application keeps those concepts configurable and applies every scenario through the same simulation engine.
 Authoritative application defaults live in [`settings.py`](../src/mortgage_simulator/settings.py); the implemented
 model lives in [`simulation/models.py`](../src/mortgage_simulator/simulation/models.py) and
-[`simulation/engine.py`](../src/mortgage_simulator/simulation/engine.py).
+[`simulation/mortgage_schedule.py`](../src/mortgage_simulator/simulation/mortgage_schedule.py).
 
 ## Intentional divergences
 

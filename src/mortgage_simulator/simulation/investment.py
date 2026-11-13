@@ -1,6 +1,5 @@
 """Deposit maturities and mortgage-cost optimization."""
 
-from collections.abc import Callable
 from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal
 
 from mortgage_simulator.simulation.models import (
@@ -15,6 +14,7 @@ from mortgage_simulator.simulation.models import (
     SimulationRequest,
     SimulationResult,
 )
+from mortgage_simulator.simulation.mortgage_schedule import calculate_schedule
 
 CENT = Decimal("0.01")
 TAX_RATE = Decimal("0.19")
@@ -41,14 +41,12 @@ def deposit_term(balance: Decimal, investment: DepositInvestment, maturity_month
 def evaluate_investment(
     terms: MortgageTerms,
     scenario: OverpaymentScenario,
-    mortgage_simulator: Callable[[MortgageTerms, OverpaymentScenario], SimulationResult],
 ) -> SimulationResult:
-    """Evaluate scenario deposit candidates using the supplied mortgage calculator.
+    """Evaluate scenario deposit candidates using the shared mortgage schedule calculator.
 
     Args:
         terms: Shared mortgage assumptions.
         scenario: Scenario containing one investment.
-        mortgage_simulator: Existing mortgage calculation path.
 
     Returns:
         Selected mortgage schedule, investment ledger, and candidate comparisons.
@@ -56,13 +54,13 @@ def evaluate_investment(
     SimulationRequest(terms=terms, scenarios=(scenario,))
     investment = scenario.investment
     assert investment is not None
-    base_scenario = scenario.model_copy(update={"investment": None})
-    base_result = mortgage_simulator(terms, base_scenario)
-    payoff = base_result.summary.payoff_month
-    if base_result.summary.horizon_settlement > ZERO:
+    scenario_without_investment = scenario.model_copy(update={"investment": None})
+    result_without_investment = calculate_schedule(terms, scenario_without_investment)
+    payoff = result_without_investment.summary.payoff_month
+    if result_without_investment.summary.horizon_settlement > ZERO:
         payoff = None
     results = [
-        _evaluate_candidate(terms, base_scenario, base_result, investment, count, payoff, mortgage_simulator)
+        _evaluate_candidate(terms, scenario_without_investment, result_without_investment, investment, count, payoff)
         for count in _candidate_counts(terms, investment)
     ]
     results.sort(key=lambda item: (item[1].total_mortgage_cost, item[1].repayment_month, item[1].term_count))
@@ -101,16 +99,15 @@ def _grow_deposit(
 def _apply_repayment(
     terms: MortgageTerms,
     scenario: OverpaymentScenario,
-    base_result: SimulationResult,
+    result_without_investment: SimulationResult,
     balance: Decimal,
     completion: int,
-    mortgage_simulator: Callable[[MortgageTerms, OverpaymentScenario], SimulationResult],
 ) -> tuple[SimulationResult, Decimal]:
     payment_scenario = scenario.model_copy(
         update={"lump_sums": (*scenario.lump_sums, LumpSum(month=completion, amount=balance))}
     )
-    result = mortgage_simulator(terms, payment_scenario)
-    previous_lump = next((p.lump_sum for p in base_result.payments if p.month == completion), ZERO)
+    result = calculate_schedule(terms, payment_scenario)
+    previous_lump = next((p.lump_sum for p in result_without_investment.payments if p.month == completion), ZERO)
     actual_lump = next((p.lump_sum for p in result.payments if p.month == completion), ZERO)
     return result, actual_lump - previous_lump
 
@@ -135,17 +132,16 @@ def _investment_summary(
 def _evaluate_candidate(
     terms: MortgageTerms,
     scenario: OverpaymentScenario,
-    base_result: SimulationResult,
+    result_without_investment: SimulationResult,
     investment: DepositInvestment,
     count: int,
     payoff: int | None,
-    mortgage_simulator: Callable[[MortgageTerms, OverpaymentScenario], SimulationResult],
 ) -> tuple[SimulationResult, InvestmentCandidate]:
     balance, completion, ledger = _grow_deposit(investment, count, payoff)
-    result, applied = base_result, ZERO
+    result, applied = result_without_investment, ZERO
     # A mortgage paid by other payments on the maturity date consumes no deposit funds.
     if payoff is None or payoff > completion:
-        result, applied = _apply_repayment(terms, scenario, base_result, balance, completion, mortgage_simulator)
+        result, applied = _apply_repayment(terms, scenario, result_without_investment, balance, completion)
     summary = _investment_summary(count, balance, completion, ledger, applied)
     return result, InvestmentCandidate(
         term_count=count,
