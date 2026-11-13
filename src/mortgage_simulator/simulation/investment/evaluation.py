@@ -22,12 +22,6 @@ ZERO = Decimal("0")
 
 def evaluate_investment(terms: MortgageTerms, scenario: OverpaymentScenario) -> SimulationResult:
     """Return the best investment-funded result for mortgage terms and a scenario."""
-    return _select_result(_evaluate_candidates(terms, scenario))
-
-
-def _evaluate_candidates(
-    terms: MortgageTerms, scenario: OverpaymentScenario
-) -> list[tuple[SimulationResult, InvestmentCandidate]]:
     SimulationRequest(terms=terms, scenarios=(scenario,))
     investment = scenario.investment
     assert investment is not None
@@ -36,13 +30,11 @@ def _evaluate_candidates(
     payoff = result_without_investment.summary.payoff_month
     if result_without_investment.summary.horizon_settlement > ZERO:
         payoff = None
-    return [
+    results = [
         _evaluate_candidate(terms, scenario_without_investment, result_without_investment, investment, count, payoff)
         for count in _candidate_counts(terms, investment)
     ]
 
-
-def _select_result(results: list[tuple[SimulationResult, InvestmentCandidate]]) -> SimulationResult:
     results.sort(key=lambda item: (item[1].total_mortgage_cost, item[1].repayment_month, item[1].term_count))
     winner, candidate = results[0]
     return winner.model_copy(

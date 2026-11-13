@@ -71,7 +71,27 @@ def calculate_payment(
         scheduled + charges.interest - charges.subsidy + charges.fees,
     )
 
-    return _build_payment(month, payment_date, opening_balance, allocation, charges)
+    principal = allocation.scheduled + allocation.recurring + allocation.lump_sum + allocation.horizon_settlement
+    cash_outflow_without_fees = principal + charges.interest - charges.subsidy
+    cash_outflow = cash_outflow_without_fees + charges.fees
+    return MonthlyPayment(
+        month=month,
+        payment_date=payment_date,
+        opening_balance=opening_balance,
+        scheduled_principal=allocation.scheduled,
+        recurring_overpayment=allocation.recurring,
+        lump_sum=allocation.lump_sum,
+        horizon_settlement=allocation.horizon_settlement,
+        interest=charges.interest,
+        subsidy=charges.subsidy,
+        monthly_insurance=charges.monthly_insurance,
+        monthly_fixed_fees=charges.monthly_fixed_fees,
+        annual_fixed_fee=charges.annual_fixed_fee,
+        fees=charges.fees,
+        cash_outflow_without_fees=cash_outflow_without_fees,
+        cash_outflow=cash_outflow,
+        closing_balance=allocation.remaining_balance,
+    )
 
 
 def _calculate_charges(
@@ -104,36 +124,6 @@ def _calculate_charges(
         month,
     )
     return _Charges(interest, subsidy, monthly_insurance, monthly_fixed_fees, annual_fixed_fee)
-
-
-def _build_payment(
-    month: int,
-    payment_date: date,
-    opening_balance: Decimal,
-    allocation: _PrincipalAllocation,
-    charges: _Charges,
-) -> MonthlyPayment:
-    principal = allocation.scheduled + allocation.recurring + allocation.lump_sum + allocation.horizon_settlement
-    cash_outflow_without_fees = principal + charges.interest - charges.subsidy
-    cash_outflow = cash_outflow_without_fees + charges.fees
-    return MonthlyPayment(
-        month=month,
-        payment_date=payment_date,
-        opening_balance=opening_balance,
-        scheduled_principal=allocation.scheduled,
-        recurring_overpayment=allocation.recurring,
-        lump_sum=allocation.lump_sum,
-        horizon_settlement=allocation.horizon_settlement,
-        interest=charges.interest,
-        subsidy=charges.subsidy,
-        monthly_insurance=charges.monthly_insurance,
-        monthly_fixed_fees=charges.monthly_fixed_fees,
-        annual_fixed_fee=charges.annual_fixed_fee,
-        fees=charges.fees,
-        cash_outflow_without_fees=cash_outflow_without_fees,
-        cash_outflow=cash_outflow,
-        closing_balance=allocation.remaining_balance,
-    )
 
 
 def _apply_principal(
