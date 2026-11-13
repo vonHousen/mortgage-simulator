@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from mortgage_simulator.simulation.investment_schedule import calculate_investment_schedule
+from mortgage_simulator.simulation.investment.schedule import calculate_investment_schedule
 from mortgage_simulator.simulation.models import (
     DepositInvestment,
     DepositTerm,
@@ -20,27 +20,15 @@ from mortgage_simulator.simulation.mortgage_schedule import calculate_schedule
 ZERO = Decimal("0")
 
 
-def evaluate_investment(
-    terms: MortgageTerms,
-    scenario: OverpaymentScenario,
-) -> SimulationResult:
-    """Evaluate scenario deposit candidates using the shared mortgage schedule calculator.
-
-    Args:
-        terms: Shared mortgage assumptions.
-        scenario: Scenario containing one investment.
-
-    Returns:
-        Selected mortgage schedule, investment ledger, and candidate comparisons.
-    """
-    SimulationRequest(terms=terms, scenarios=(scenario,))
-    candidates = _evaluate_candidates(terms, scenario)
-    return _select_result(candidates)
+def evaluate_investment(terms: MortgageTerms, scenario: OverpaymentScenario) -> SimulationResult:
+    """Return the best investment-funded result for mortgage terms and a scenario."""
+    return _select_result(_evaluate_candidates(terms, scenario))
 
 
 def _evaluate_candidates(
     terms: MortgageTerms, scenario: OverpaymentScenario
 ) -> list[tuple[SimulationResult, InvestmentCandidate]]:
+    SimulationRequest(terms=terms, scenarios=(scenario,))
     investment = scenario.investment
     assert investment is not None
     scenario_without_investment = scenario.model_copy(update={"investment": None})

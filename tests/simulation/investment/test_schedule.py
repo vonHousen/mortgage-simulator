@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pytest
 
-from mortgage_simulator.simulation.investment_schedule import deposit_term
+from mortgage_simulator.simulation.investment.schedule import deposit_term
 from mortgage_simulator.simulation.models import DepositInvestment
 
 
