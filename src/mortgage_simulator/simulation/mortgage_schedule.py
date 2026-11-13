@@ -34,86 +34,15 @@ def calculate_schedule(terms: MortgageTerms, scenario: OverpaymentScenario) -> S
     Returns:
         Ordered mortgage payments and their aggregate summary.
     """
-    scheduled_principal = terms.principal / Decimal(terms.contractual_term_months)
     opening_balance = terms.principal
     previous_opening_balance = opening_balance
     payments: list[MonthlyPayment] = []
 
     for month in range(1, terms.analysis_horizon_months + 1):
-        payment_date = _payment_date(terms.first_payment_date, month)
-        period_start = _previous_payment_date(payment_date)
-        previous_period_start = _previous_payment_date(period_start)
-        annual_rate = _annual_rate_for_month(terms.rate_periods, month)
-        interest = (
-            opening_balance
-            * annual_rate
-            * _interest_year_fraction(
-                terms.interest_calculation_method,
-                period_start,
-                payment_date,
-            )
-        )
-        subsidy = _calculate_subsidy(opening_balance, terms.subsidy, month)
-        monthly_insurance, monthly_fixed_fees, annual_fixed_fee = _calculate_fee_components(
-            terms,
-            previous_opening_balance,
-            opening_balance,
-            previous_period_start,
-            period_start,
-            payment_date,
-            month,
-        )
-        fees = monthly_insurance + monthly_fixed_fees + annual_fixed_fee
-
-        applied_scheduled = min(scheduled_principal, opening_balance)
-        remaining_balance = opening_balance - applied_scheduled
-
-        recurring_requested = ZERO
-        if scenario.recurring_start_month is not None and month >= scenario.recurring_start_month:
-            if scenario.cash_outflow_target > ZERO:
-                base_cash_outflow = applied_scheduled + interest - subsidy + fees
-                recurring_requested = max(scenario.cash_outflow_target - base_cash_outflow, ZERO)
-            else:
-                recurring_requested = scenario.recurring_amount
-        applied_recurring = min(recurring_requested, remaining_balance)
-        remaining_balance -= applied_recurring
-
-        applied_lump_sum = ZERO
-        for lump_sum in scenario.lump_sums:
-            if lump_sum.month == month:
-                applied_amount = min(lump_sum.amount, remaining_balance)
-                applied_lump_sum += applied_amount
-                remaining_balance -= applied_amount
-
-        horizon_settlement = ZERO
-        if terms.settle_remaining_principal_at_horizon and month == terms.analysis_horizon_months:
-            horizon_settlement = remaining_balance
-            remaining_balance = ZERO
-
-        principal = applied_scheduled + applied_recurring + applied_lump_sum + horizon_settlement
-        cash_outflow_without_fees = principal + interest - subsidy
-        cash_outflow = cash_outflow_without_fees + fees
-        payment = MonthlyPayment(
-            month=month,
-            payment_date=payment_date,
-            opening_balance=opening_balance,
-            scheduled_principal=applied_scheduled,
-            recurring_overpayment=applied_recurring,
-            lump_sum=applied_lump_sum,
-            horizon_settlement=horizon_settlement,
-            interest=interest,
-            subsidy=subsidy,
-            monthly_insurance=monthly_insurance,
-            monthly_fixed_fees=monthly_fixed_fees,
-            annual_fixed_fee=annual_fixed_fee,
-            fees=fees,
-            cash_outflow_without_fees=cash_outflow_without_fees,
-            cash_outflow=cash_outflow,
-            closing_balance=remaining_balance,
-        )
+        payment = _calculate_payment(terms, scenario, month, opening_balance, previous_opening_balance)
         payments.append(payment)
         previous_opening_balance = opening_balance
-        opening_balance = remaining_balance
+        opening_balance = payment.closing_balance
         if opening_balance == ZERO:
             break
 
@@ -123,6 +52,104 @@ def calculate_schedule(terms: MortgageTerms, scenario: OverpaymentScenario) -> S
         payments=payment_tuple,
         summary=_summarize(payment_tuple, terms),
     )
+
+
+def _calculate_payment(
+    terms: MortgageTerms,
+    scenario: OverpaymentScenario,
+    month: int,
+    opening_balance: Decimal,
+    previous_opening_balance: Decimal,
+) -> MonthlyPayment:
+    payment_date = _payment_date(terms.first_payment_date, month)
+    period_start = _previous_payment_date(payment_date)
+    previous_period_start = _previous_payment_date(period_start)
+    annual_rate = _annual_rate_for_month(terms.rate_periods, month)
+    interest = (
+        opening_balance
+        * annual_rate
+        * _interest_year_fraction(
+            terms.interest_calculation_method,
+            period_start,
+            payment_date,
+        )
+    )
+    subsidy = _calculate_subsidy(opening_balance, terms.subsidy, month)
+    monthly_insurance, monthly_fixed_fees, annual_fixed_fee = _calculate_fee_components(
+        terms,
+        previous_opening_balance,
+        opening_balance,
+        previous_period_start,
+        period_start,
+        payment_date,
+        month,
+    )
+    fees = monthly_insurance + monthly_fixed_fees + annual_fixed_fee
+
+    applied_scheduled, applied_recurring, applied_lump_sum, horizon_settlement, remaining_balance = _apply_principal(
+        terms,
+        scenario,
+        month,
+        opening_balance,
+        min(terms.principal / Decimal(terms.contractual_term_months), opening_balance) + interest - subsidy + fees,
+    )
+
+    principal = applied_scheduled + applied_recurring + applied_lump_sum + horizon_settlement
+    cash_outflow_without_fees = principal + interest - subsidy
+    cash_outflow = cash_outflow_without_fees + fees
+    return MonthlyPayment(
+        month=month,
+        payment_date=payment_date,
+        opening_balance=opening_balance,
+        scheduled_principal=applied_scheduled,
+        recurring_overpayment=applied_recurring,
+        lump_sum=applied_lump_sum,
+        horizon_settlement=horizon_settlement,
+        interest=interest,
+        subsidy=subsidy,
+        monthly_insurance=monthly_insurance,
+        monthly_fixed_fees=monthly_fixed_fees,
+        annual_fixed_fee=annual_fixed_fee,
+        fees=fees,
+        cash_outflow_without_fees=cash_outflow_without_fees,
+        cash_outflow=cash_outflow,
+        closing_balance=remaining_balance,
+    )
+
+
+def _apply_principal(
+    terms: MortgageTerms,
+    scenario: OverpaymentScenario,
+    month: int,
+    opening_balance: Decimal,
+    base_cash_outflow: Decimal,
+) -> tuple[Decimal, Decimal, Decimal, Decimal, Decimal]:
+    scheduled_principal = terms.principal / Decimal(terms.contractual_term_months)
+    applied_scheduled = min(scheduled_principal, opening_balance)
+    remaining_balance = opening_balance - applied_scheduled
+
+    recurring_requested = ZERO
+    if scenario.recurring_start_month is not None and month >= scenario.recurring_start_month:
+        if scenario.cash_outflow_target > ZERO:
+            recurring_requested = max(scenario.cash_outflow_target - base_cash_outflow, ZERO)
+        else:
+            recurring_requested = scenario.recurring_amount
+    applied_recurring = min(recurring_requested, remaining_balance)
+    remaining_balance -= applied_recurring
+
+    applied_lump_sum = ZERO
+    for lump_sum in scenario.lump_sums:
+        if lump_sum.month == month:
+            applied_amount = min(lump_sum.amount, remaining_balance)
+            applied_lump_sum += applied_amount
+            remaining_balance -= applied_amount
+
+    horizon_settlement = ZERO
+    if terms.settle_remaining_principal_at_horizon and month == terms.analysis_horizon_months:
+        horizon_settlement = remaining_balance
+        remaining_balance = ZERO
+
+    return applied_scheduled, applied_recurring, applied_lump_sum, horizon_settlement, remaining_balance
 
 
 def _annual_rate_for_month(rate_periods: tuple[RatePeriod, ...], month: int) -> Decimal:

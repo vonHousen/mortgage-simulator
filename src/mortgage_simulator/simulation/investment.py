@@ -1,7 +1,8 @@
 """Deposit maturities and mortgage-cost optimization."""
 
-from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal
+from decimal import Decimal
 
+from mortgage_simulator.simulation.investment_schedule import calculate_investment_schedule
 from mortgage_simulator.simulation.models import (
     DepositInvestment,
     DepositTerm,
@@ -16,26 +17,7 @@ from mortgage_simulator.simulation.models import (
 )
 from mortgage_simulator.simulation.mortgage_schedule import calculate_schedule
 
-CENT = Decimal("0.01")
-TAX_RATE = Decimal("0.19")
-MONTHS_PER_YEAR = Decimal("12")
 ZERO = Decimal("0")
-
-
-def deposit_term(balance: Decimal, investment: DepositInvestment, maturity_month: int) -> DepositTerm:
-    """Calculate one term using balance, deposit terms, and its maturity month."""
-    gross = (balance * investment.annual_rate * investment.term_months / MONTHS_PER_YEAR).quantize(
-        CENT, rounding=ROUND_HALF_UP
-    )
-    taxable = gross.quantize(CENT, rounding=ROUND_CEILING)
-    tax = (taxable * TAX_RATE).quantize(CENT, rounding=ROUND_CEILING)
-    return DepositTerm(
-        maturity_month=maturity_month,
-        opening_balance=balance,
-        gross_interest=gross,
-        tax=tax,
-        closing_balance=balance + gross - tax,
-    )
 
 
 def evaluate_investment(
@@ -52,6 +34,13 @@ def evaluate_investment(
         Selected mortgage schedule, investment ledger, and candidate comparisons.
     """
     SimulationRequest(terms=terms, scenarios=(scenario,))
+    candidates = _evaluate_candidates(terms, scenario)
+    return _select_result(candidates)
+
+
+def _evaluate_candidates(
+    terms: MortgageTerms, scenario: OverpaymentScenario
+) -> list[tuple[SimulationResult, InvestmentCandidate]]:
     investment = scenario.investment
     assert investment is not None
     scenario_without_investment = scenario.model_copy(update={"investment": None})
@@ -59,10 +48,13 @@ def evaluate_investment(
     payoff = result_without_investment.summary.payoff_month
     if result_without_investment.summary.horizon_settlement > ZERO:
         payoff = None
-    results = [
+    return [
         _evaluate_candidate(terms, scenario_without_investment, result_without_investment, investment, count, payoff)
         for count in _candidate_counts(terms, investment)
     ]
+
+
+def _select_result(results: list[tuple[SimulationResult, InvestmentCandidate]]) -> SimulationResult:
     results.sort(key=lambda item: (item[1].total_mortgage_cost, item[1].repayment_month, item[1].term_count))
     winner, candidate = results[0]
     return winner.model_copy(
@@ -76,24 +68,6 @@ def _candidate_counts(terms: MortgageTerms, investment: DepositInvestment) -> ra
         return range(maximum + 1)
     assert investment.term_count is not None
     return (investment.term_count,)
-
-
-def _grow_deposit(
-    investment: DepositInvestment, count: int, payoff: int | None
-) -> tuple[Decimal, int, tuple[DepositTerm, ...]]:
-    balance = investment.initial_amount
-    completion = investment.start_month
-    ledger: list[DepositTerm] = []
-    if payoff is not None and payoff <= completion:
-        return balance, completion, ()
-    for index in range(1, count + 1):
-        completion = investment.start_month + index * investment.term_months
-        term = deposit_term(balance, investment, completion)
-        ledger.append(term)
-        balance = term.closing_balance
-        if payoff is not None and payoff <= completion:
-            break
-    return balance, completion, tuple(ledger)
 
 
 def _apply_repayment(
@@ -137,7 +111,7 @@ def _evaluate_candidate(
     count: int,
     payoff: int | None,
 ) -> tuple[SimulationResult, InvestmentCandidate]:
-    balance, completion, ledger = _grow_deposit(investment, count, payoff)
+    balance, completion, ledger = calculate_investment_schedule(investment, count, payoff)
     result, applied = result_without_investment, ZERO
     # A mortgage paid by other payments on the maturity date consumes no deposit funds.
     if payoff is None or payoff > completion:
