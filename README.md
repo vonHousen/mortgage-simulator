@@ -41,6 +41,12 @@ Treat deployment `.env` and scenario files as user-visible configuration: a host
 assumptions and scenarios loaded from them through its interface and generated results. Do not deploy private values
 to an instance that untrusted users can access.
 
+## Run simulations without the UI
+
+Use the [headless Just workflow](docs/11-cli-simulations.md) to export a mortgage profile, compare named strategies,
+and replay saved inputs. Agents can use the [repository skill](.agents/skills/run-mortgage-simulation/SKILL.md).
+The CLI shares the calculation engine and reporting code with Streamlit and never starts the UI.
+
 ## Development
 
 Development also requires [lychee](https://github.com/lycheeverse/lychee), available on macOS with

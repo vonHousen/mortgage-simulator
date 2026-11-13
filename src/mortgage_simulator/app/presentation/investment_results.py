@@ -9,6 +9,7 @@ from mortgage_simulator.app.presentation.result_metrics import (
     NET_FINANCING_COST_HELP,
     RETAINED_SURPLUS_HELP,
 )
+from mortgage_simulator.reporting.investment_schedules import investment_candidates_frame, investment_ledger_frame
 from mortgage_simulator.simulation.models import SimulationResult
 
 
@@ -30,17 +31,15 @@ def render_investment_results(result: SimulationResult) -> None:
             f"Completed in month {investment.completion_month}"
         )
         if investment.terms:
-            ledger = pl.DataFrame(
-                [
-                    {
-                        "Maturity month": term.maturity_month,
-                        "Opening balance (PLN)": float(term.opening_balance),
-                        "Gross deposit interest (PLN)": float(term.gross_interest),
-                        "Deposit tax (PLN)": float(term.tax),
-                        "Closing balance (PLN)": float(term.closing_balance),
-                    }
-                    for term in investment.terms
-                ]
+            ledger = _display_frame(
+                investment_ledger_frame(result),
+                {
+                    "maturity_month": "Maturity month",
+                    "opening_balance": "Opening balance (PLN)",
+                    "gross_interest": "Gross deposit interest (PLN)",
+                    "tax": "Deposit tax (PLN)",
+                    "closing_balance": "Closing balance (PLN)",
+                },
             )
             st.dataframe(ledger, hide_index=True, width="stretch")
             st.download_button("Download investment ledger", ledger.write_csv(), "investment-ledger.csv", "text/csv")
@@ -55,20 +54,18 @@ def render_investment_results(result: SimulationResult) -> None:
                     f"Net financing savings versus immediate repayment: "
                     f"{immediate.net_financing_cost - winner.net_financing_cost:,.2f} PLN."
                 )
-                candidates = pl.DataFrame(
-                    [
-                        {
-                            "Recommended": index == 0,
-                            "Terms": candidate.term_count,
-                            "Completion month": candidate.repayment_month,
-                            "Net financing cost (PLN)": float(candidate.net_financing_cost),
-                            "Total mortgage cost (PLN)": float(candidate.total_mortgage_cost),
-                            "Ending debt (PLN)": float(candidate.ending_balance),
-                            "Net investment earnings (PLN)": float(candidate.investment.net_earnings),
-                            "Retained surplus (PLN)": float(candidate.investment.retained_surplus),
-                        }
-                        for index, candidate in enumerate(result.investment_candidates)
-                    ]
+                candidates = _display_frame(
+                    investment_candidates_frame(result),
+                    {
+                        "recommended": "Recommended",
+                        "term_count": "Terms",
+                        "repayment_month": "Completion month",
+                        "net_financing_cost": "Net financing cost (PLN)",
+                        "total_mortgage_cost": "Total mortgage cost (PLN)",
+                        "ending_balance": "Ending debt (PLN)",
+                        "net_earnings": "Net investment earnings (PLN)",
+                        "retained_surplus": "Retained surplus (PLN)",
+                    },
                 )
                 st.dataframe(
                     candidates,
@@ -84,3 +81,7 @@ def render_investment_results(result: SimulationResult) -> None:
                 st.download_button(
                     "Download repayment candidates", candidates.write_csv(), "investment-candidates.csv", "text/csv"
                 )
+
+
+def _display_frame(frame: pl.DataFrame, labels: dict[str, str]) -> pl.DataFrame:
+    return frame.drop("scenario").with_columns(pl.col(pl.String).cast(pl.Float64)).rename(labels)

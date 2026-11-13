@@ -12,7 +12,11 @@ dependencies = [
     "pydantic",
     "pydantic-settings",
     "streamlit",
+    "typer>=0.29.1",
 ]
+
+[project.scripts]
+mortgage-simulator = "mortgage_simulator.cli:app"
 
 [dependency-groups]
 dev = [

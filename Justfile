@@ -48,3 +48,22 @@ typecheck: mypy (pre-commit "ty")
 lock-check: (pre-commit "uv-lock")
 
 ci: pre-commit mypy test
+
+# Freeze current settings into a reusable mortgage profile.
+simulation-profile-export output:
+    @uv run mortgage-simulator profile export --output {{quote(output)}}
+
+# Print a profile or request JSON schema.
+simulation-schema kind:
+    @uv run mortgage-simulator schema {{quote(kind)}}
+
+# Compare strategies, optionally merging a saved mortgage profile.
+simulate request output profile="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    args=(run --request {{quote(request)}} --output {{quote(output)}})
+    profile={{quote(profile)}}
+    if [[ -n "$profile" ]]; then
+        args+=(--profile "$profile")
+    fi
+    uv run mortgage-simulator "${args[@]}"

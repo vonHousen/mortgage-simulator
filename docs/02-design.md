@@ -20,6 +20,15 @@ scenario ─┘                         │
 local workbook ─> reference-data adapter ─> regression tests
 ```
 
+### Headless interface
+
+The [headless workflow](11-cli-simulations.md) exposes the same calculations through Just recipes and a thin Typer
+adapter. Interface-independent application services resolve explicit profiles and requests, validate scenarios, run
+the shared engine, and export results. Reporting owns reusable comparison and schedule projections; UI formatting
+stays in Streamlit. Neither the CLI nor these services imports or launches Streamlit. Settings are read only by
+explicit profile export, so resolved requests replay without environment-dependent inputs.
+[ADR 0011](adr/0011-headless-simulation-interface.md) records the separation of concerns.
+
 ### Configuration
 
 The package-root [`settings.py`](../src/mortgage_simulator/settings.py) is the single source of truth for application

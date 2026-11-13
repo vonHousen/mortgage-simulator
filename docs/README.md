@@ -14,6 +14,9 @@ architecture decisions for Mortgage Simulator. Start with the [root README](../R
 manual and automatic timing, and worked examples. [Understanding the metrics](10-understanding-metrics.md) explains
 the primary decision metric, payment versus cost, and the relationship between mortgage charges and deposit earnings.
 
+[Headless simulation workflow](11-cli-simulations.md) covers agent and human use through Just, saved profiles,
+comparison requests, machine-readable results, and replay.
+
 ## Model and evidence
 
 | Document | Purpose |
@@ -58,3 +61,4 @@ defaults, source precedence, and validation. Authoritative setting names and def
 | [0008](adr/0008-centralize-environment-configuration.md) | Accepted | Centralize environment configuration under a grouped settings model. |
 | [0009](adr/0009-share-pre-commit-checks-with-ci.md) | Accepted | Share pre-commit checks with local and hosted CI; run only ty before commits and both type checkers in CI. |
 | [0010](adr/0010-use-net-financing-cost-for-investment-timing.md) | Accepted | Use Net financing cost as the primary comparison metric and automatic investment timing objective. |
+| [0011](adr/0011-headless-simulation-interface.md) | Accepted | Separate headless command handling, application services, reporting, and simulation. |

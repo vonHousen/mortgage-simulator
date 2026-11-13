@@ -8,6 +8,11 @@ All the necessary context can be found in the [docs](docs/) directory. Among oth
 - the design doc with a high-level specification in [design.md](docs/02-design.md),
 - important design decisions taken during this project development are gathered in [docs/adr/](docs/adr/). Some of them might answer some questions during the development.
 
+## Running simulations
+
+For headless simulation requests, use the [run-mortgage-simulation skill](.agents/skills/run-mortgage-simulation/SKILL.md).
+It routes to the maintained [Just workflow](docs/11-cli-simulations.md).
+
 ## Development commands
 
 - This project uses `uv` for package management (prepend all commands with `uv run`, e.g. `uv run pytest` instead of activating the virtual environment)
