@@ -157,7 +157,7 @@ at the remaining balance.
 
 ## JSON configuration
 
-Each scenario can use an `investment` list. Existing single-object configurations such as the example below also
+Each scenario can use an `investments` list. Existing configurations using the singular `investment` key also
 load. For a list that combines single and monthly deposits, see the [CLI example](11-cli-simulations.md#example-mix-up-front-and-monthly-deposits).
 
 This example seeds three equivalent capital allocations with different repayment timings:
@@ -167,35 +167,35 @@ This example seeds three equivalent capital allocations with different repayment
   "scenarios": [
     {
       "name": "Repay immediately",
-      "investment": {
+      "investments": [{
         "initial_amount": "100000.00",
         "start_month": 1,
         "annual_rate": "0.06",
         "term_months": 3,
         "mode": "manual",
         "term_count": 0
-      }
+      }]
     },
     {
       "name": "Renew once then repay",
-      "investment": {
+      "investments": [{
         "initial_amount": "100000.00",
         "start_month": 1,
         "annual_rate": "0.06",
         "term_months": 3,
         "mode": "manual",
         "term_count": 2
-      }
+      }]
     },
     {
       "name": "Optimize timing",
-      "investment": {
+      "investments": [{
         "initial_amount": "100000.00",
         "start_month": 1,
         "annual_rate": "0.06",
         "term_months": 3,
         "mode": "automatic"
-      }
+      }]
     }
   ]
 }

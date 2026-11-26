@@ -142,7 +142,7 @@ class TestHeadlessCli:
                 "name": "Mixed investments",
                 "recurring_amount": "1000",
                 "recurring_start_month": 1,
-                "investment": [
+                "investments": [
                     {
                         "initial_amount": "100000",
                         "start_month": 1,
@@ -212,7 +212,7 @@ class TestHeadlessCli:
 
         # Assert
         assert replay.returncode == 0, replay.stderr
-        stored_investments = json.loads(resolved_request.read_text())["scenarios"][0]["investment"]
+        stored_investments = json.loads(resolved_request.read_text())["scenarios"][0]["investments"]
         assert len(stored_investments) == 2
         replayed_report = RunReport.model_validate_json(replay.stdout)
         assert replayed_report.results == report.results
@@ -221,7 +221,10 @@ class TestHeadlessCli:
         deposit_csv = report.artifacts["investment_deposits"]
         assert replayed_report.artifacts["investment_deposits"].read_text() == deposit_csv.read_text()
 
-    def test_when_request_uses_legacy_investment_object_expect_resolved_list(self, tmp_path: Path) -> None:
+    @pytest.mark.parametrize("legacy_as_list", [False, True])
+    def test_when_request_uses_legacy_investment_key_expect_resolved_list(
+        self, tmp_path: Path, legacy_as_list: bool
+    ) -> None:
         # Arrange
         terms = default_mortgage_terms(analysis_horizon_months=12)
         request = tmp_path / "legacy.json"
@@ -237,7 +240,12 @@ class TestHeadlessCli:
             json.dumps(
                 {
                     "terms": terms.model_dump(mode="json"),
-                    "scenarios": [{"name": "Legacy deposit", "investment": legacy_deposit}],
+                    "scenarios": [
+                        {
+                            "name": "Legacy deposit",
+                            "investment": [legacy_deposit] if legacy_as_list else legacy_deposit,
+                        }
+                    ],
                 }
             )
         )
@@ -248,7 +256,7 @@ class TestHeadlessCli:
         # Assert
         assert completed.returncode == 0, completed.stderr
         resolved = json.loads((output / "resolved-request.json").read_text())
-        investments = resolved["scenarios"][0]["investment"]
+        investments = resolved["scenarios"][0]["investments"]
         assert len(investments) == 1
         assert {field: investments[0][field] for field in legacy_deposit} == legacy_deposit
         report = RunReport.model_validate_json(completed.stdout)
@@ -312,9 +320,20 @@ class TestHeadlessCli:
         assert schema.returncode == 0, schema.stderr
         assert json.loads(profile.read_text())["principal"] == "456789.12"
         assert json.loads(first.stdout)["results"] == json.loads(replayed.stdout)["results"]
-        assert "scenarios" in json.loads(schema.stdout)["properties"]
+        request_schema = json.loads(schema.stdout)
+        assert "scenarios" in request_schema["properties"]
+        scenario_properties = request_schema["$defs"]["OverpaymentScenario"]["properties"]
+        assert scenario_properties["investments"]["type"] == "array"
+        assert "investment" not in scenario_properties
 
-    @pytest.mark.parametrize("contents", ["{", '{"scenarios": [{"name":"Baseline"}]}'])
+    @pytest.mark.parametrize(
+        "contents",
+        [
+            "{",
+            '{"scenarios": [{"name":"Baseline"}]}',
+            '{"scenarios": [{"name":"Mixed keys","investment":[],"investments":[]}]}',
+        ],
+    )
     def test_when_invalid_request_expect_usage_error_without_artifacts(self, tmp_path: Path, contents: str) -> None:
         # Arrange
         request = tmp_path / "invalid.json"
@@ -431,13 +450,15 @@ def _scenario(strategy: str) -> OverpaymentScenario:
     mode = InvestmentMode(strategy)
     return OverpaymentScenario(
         name=strategy,
-        investment=DepositInvestment(
-            initial_amount=Decimal("12000"),
-            start_month=1,
-            annual_rate=Decimal("0.05"),
-            term_months=3,
-            mode=mode,
-            term_count=2 if mode == InvestmentMode.MANUAL else None,
+        investments=(
+            DepositInvestment(
+                initial_amount=Decimal("12000"),
+                start_month=1,
+                annual_rate=Decimal("0.05"),
+                term_months=3,
+                mode=mode,
+                term_count=2 if mode == InvestmentMode.MANUAL else None,
+            ),
         ),
     )
 

@@ -82,7 +82,7 @@ class TestCompare:
         investment = DepositInvestment(
             initial_amount=Decimal("10000"), start_month=1, annual_rate=Decimal("0.10"), term_months=12, term_count=1
         )
-        result = simulate(terms, OverpaymentScenario(name="Deposit", investment=investment))
+        result = simulate(terms, OverpaymentScenario(name="Deposit", investments=(investment,)))
         # Act
         comparison = compare([baseline, result]).scenarios[1]
         # Assert

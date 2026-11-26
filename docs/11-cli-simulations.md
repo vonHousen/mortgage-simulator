@@ -121,7 +121,7 @@ at least 36 months. All amounts and rates are illustrative. This request matches
       "name": "Up-front and monthly deposits",
       "recurring_amount": "1000",
       "recurring_start_month": 1,
-      "investment": [
+      "investments": [
         {
           "initial_amount": "100000",
           "start_month": 1,

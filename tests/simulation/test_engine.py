@@ -38,7 +38,7 @@ class TestSimulate:
         )
         scenario = OverpaymentScenario(
             name="Invalid",
-            investment=investment,
+            investments=(investment,) if investment else (),
             lump_sums=(LumpSum(month=terms.analysis_horizon_months + 1, amount=Decimal("1000")),),
         )
         # Act / Assert

@@ -38,7 +38,7 @@ def initialize_state(
     """
     if INVESTMENTS_KEY not in st.session_state:
         st.session_state[INVESTMENTS_KEY] = {
-            scenario.name: scenario.deposit_entries for scenario in scenario_defaults if scenario.deposit_entries
+            scenario.name: scenario.investments for scenario in scenario_defaults if scenario.investments
         }
     if TERMS_KEY not in st.session_state:
         st.session_state[TERMS_KEY] = terms

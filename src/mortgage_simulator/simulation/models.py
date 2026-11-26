@@ -3,9 +3,9 @@
 from datetime import date
 from decimal import Decimal
 from enum import StrEnum
-from typing import Annotated, Self
+from typing import Annotated, Self, cast
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 ZERO = Decimal("0")
 MAX_V1_HORIZON_MONTHS = 120
@@ -228,32 +228,34 @@ class OverpaymentScenario(FrozenModel):
     cash_outflow_target: Decimal = Field(default=ZERO, ge=ZERO)
     recurring_start_month: int | None = Field(default=None, ge=1)
     lump_sums: tuple[LumpSum, ...] = ()
-    investment: tuple[DepositInvestment, ...] | DepositInvestment | None = ()
+    investments: tuple[DepositInvestment, ...] = ()
 
-    @field_validator("investment", mode="before")
+    @model_validator(mode="before")
     @classmethod
-    def normalize_investment(cls, value: object) -> object:
-        """Normalize legacy single-deposit input to the canonical collection.
+    def normalize_legacy_investment(cls, value: object) -> object:
+        """Accept the former singular key when loading saved scenario data.
 
         Args:
-            value: Raw investment input, including a legacy object or null.
+            value: Raw scenario input.
         """
-        if value is None:
-            return ()
-        if isinstance(value, (dict, DepositInvestment)):
-            return (value,)
-        return value
+        if not isinstance(value, dict) or "investment" not in value:
+            return value
+        if "investments" in value:
+            raise ValueError("use either investments or the legacy investment key")
 
-    @property
-    def deposit_entries(self) -> tuple[DepositInvestment, ...]:
-        """Return the validated deposit entries in configuration order."""
-        assert isinstance(self.investment, tuple)
-        return self.investment
+        scenario = cast(dict[object, object], value).copy()
+        legacy = scenario.pop("investment")
+        if legacy is None:
+            legacy = ()
+        elif isinstance(legacy, (dict, DepositInvestment)):
+            legacy = (legacy,)
+        scenario["investments"] = legacy
+        return scenario
 
     @model_validator(mode="after")
     def validate_automatic_timing(self) -> Self:
         """Limit automatic timing to a single entry per scenario."""
-        if sum(entry.mode == InvestmentMode.AUTOMATIC for entry in self.deposit_entries) > 1:
+        if sum(entry.mode == InvestmentMode.AUTOMATIC for entry in self.investments) > 1:
             raise ValueError("only one investment entry may use automatic timing")
         return self
 
@@ -283,7 +285,7 @@ class SimulationRequest(FrozenModel):
         if len(names) != len(set(names)):
             raise ValueError("scenario names must be unique")
         for scenario in self.scenarios:
-            for investment in scenario.deposit_entries:
+            for investment in scenario.investments:
                 last_opening = investment.start_month + investment.contribution_months - 1
                 maturity = last_opening + (investment.term_count or 0) * investment.term_months
                 if maturity > self.terms.analysis_horizon_months:

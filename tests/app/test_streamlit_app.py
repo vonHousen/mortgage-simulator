@@ -1036,7 +1036,7 @@ def test_results_when_automatic_investment_expect_objective_and_candidate_metric
     )
     results = (
         simulate(terms, OverpaymentScenario(name="Baseline")),
-        simulate(terms, OverpaymentScenario(name="Invest", investment=investment)),
+        simulate(terms, OverpaymentScenario(name="Invest", investments=(investment,))),
     )
     app = _results_app(results, terms)
     # Act

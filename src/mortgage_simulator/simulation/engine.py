@@ -17,6 +17,6 @@ def simulate(terms: MortgageTerms, scenario: OverpaymentScenario) -> SimulationR
     """
     request = SimulationRequest(terms=terms, scenarios=(scenario,))
     terms, scenario = request.terms, request.scenarios[0]
-    if scenario.deposit_entries:
+    if scenario.investments:
         return evaluate_investment(terms, scenario)
     return calculate_schedule(terms, scenario)

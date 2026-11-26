@@ -39,7 +39,7 @@ def evaluate_investment(terms: MortgageTerms, scenario: OverpaymentScenario) -> 
         terms: Mortgage assumptions and analysis horizon.
         scenario: Mortgage overpayments and configured deposit entries.
     """
-    entries = scenario.deposit_entries
+    entries = scenario.investments
     automatic = next((entry for entry in entries if entry.mode == InvestmentMode.AUTOMATIC), None)
     if automatic is None:
         result = _evaluate_plan(terms, scenario, 0)
@@ -59,7 +59,7 @@ def evaluate_investment(terms: MortgageTerms, scenario: OverpaymentScenario) -> 
 
 
 def _evaluate_plan(terms: MortgageTerms, scenario: OverpaymentScenario, automatic_count: int) -> SimulationResult:
-    plans = _deposit_plans(scenario.deposit_entries, automatic_count)
+    plans = _deposit_plans(scenario.investments, automatic_count)
     balloons = tuple(LumpSum(month=plan.completion, amount=plan.balance) for plan in plans)
     # Payouts after payoff cannot affect the mortgage. The actual payoff then determines which deposits opened.
     result = calculate_schedule(terms, scenario.model_copy(update={"lump_sums": (*scenario.lump_sums, *balloons)}))
@@ -68,7 +68,7 @@ def _evaluate_plan(terms: MortgageTerms, scenario: OverpaymentScenario, automati
         available[lump_sum.month] = max(available.get(lump_sum.month, ZERO) - lump_sum.amount, ZERO)
 
     outcomes = _deposit_outcomes(plans, result.summary.payoff_month, available)
-    entries = scenario.deposit_entries
+    entries = scenario.investments
     legacy = outcomes[0].summary if len(entries) == 1 and entries[0].contribution_months == 1 else None
     return result.model_copy(update={"investments": outcomes, "investment": legacy})
 

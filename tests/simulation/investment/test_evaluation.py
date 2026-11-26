@@ -30,13 +30,13 @@ class TestInvestmentSimulation:
             mode=InvestmentMode.AUTOMATIC,
         )
         # Act
-        result = simulate(terms, OverpaymentScenario(name="Deposit", investment=investment))
+        result = simulate(terms, OverpaymentScenario(name="Deposit", investments=(investment,)))
         # Assert
         assert result.investment is not None
         assert result.net_financing_cost == min(c.net_financing_cost for c in result.investment_candidates)
         for candidate in result.investment_candidates:
             manual = investment.model_copy(update={"mode": InvestmentMode.MANUAL, "term_count": candidate.term_count})
-            actual = simulate(terms, OverpaymentScenario(name="Manual", investment=manual))
+            actual = simulate(terms, OverpaymentScenario(name="Manual", investments=(manual,)))
             assert actual.summary.total_mortgage_cost == candidate.total_mortgage_cost
             assert actual.net_financing_cost == candidate.net_financing_cost
 
@@ -59,7 +59,7 @@ class TestInvestmentSimulation:
             mode=InvestmentMode.AUTOMATIC,
         )
         # Act
-        result = simulate(terms, OverpaymentScenario(name="Compare", investment=investment))
+        result = simulate(terms, OverpaymentScenario(name="Compare", investments=(investment,)))
         # Assert
         assert result.investment is not None
         assert result.investment.planned_term_count == expected_terms
@@ -86,7 +86,7 @@ class TestInvestmentSimulation:
             mode=InvestmentMode.AUTOMATIC,
         )
         # Act
-        result = simulate(terms, OverpaymentScenario(name="Tie", investment=investment))
+        result = simulate(terms, OverpaymentScenario(name="Tie", investments=(investment,)))
         # Assert
         assert result.investment is not None
         assert result.investment.planned_term_count == 0
@@ -106,7 +106,7 @@ class TestInvestmentSimulation:
             mode=InvestmentMode.AUTOMATIC,
         )
         scenario = OverpaymentScenario(
-            name="Payoff", investment=investment, lump_sums=(LumpSum(month=2, amount=terms.principal),)
+            name="Payoff", investments=(investment,), lump_sums=(LumpSum(month=2, amount=terms.principal),)
         )
         # Act
         result = simulate(terms, scenario)
@@ -127,7 +127,7 @@ class TestInvestmentSimulation:
             initial_amount=Decimal("10000"), start_month=1, annual_rate=Decimal("0.06"), term_months=3, term_count=3
         )
         scenario = OverpaymentScenario(
-            name="Early", investment=investment, lump_sums=(LumpSum(month=2, amount=terms.principal),)
+            name="Early", investments=(investment,), lump_sums=(LumpSum(month=2, amount=terms.principal),)
         )
         # Act
         result = simulate(terms, scenario)
@@ -149,7 +149,7 @@ class TestInvestmentSimulation:
             term_count=1,
         )
         # Act
-        result = simulate(terms, OverpaymentScenario(name="Surplus", investment=investment))
+        result = simulate(terms, OverpaymentScenario(name="Surplus", investments=(investment,)))
         # Assert
         assert result.investment is not None
         assert result.summary.horizon_settlement == 0

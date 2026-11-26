@@ -239,7 +239,7 @@ def _render_draft(names: list[str], terms: MortgageTerms) -> None:
                     entries[index] = item
                 else:
                     entries.append(item)
-                SimulationRequest(terms=terms, scenarios=(OverpaymentScenario(name=name, investment=tuple(entries)),))
+                SimulationRequest(terms=terms, scenarios=(OverpaymentScenario(name=name, investments=tuple(entries)),))
             except (ValidationError, ValueError) as error:
                 st.error(str(error))
             else:

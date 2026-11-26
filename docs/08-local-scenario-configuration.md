@@ -49,14 +49,14 @@ tooltips, calculations, reports, tables, totals, and CSV exports. The current pr
 
 ## Deposit-funded overpayments
 
-A custom scenario can contain an optional `investment` list. Each entry is validated by `DepositInvestment` in the
-simulation models. Single-object inputs also load. For example:
+A custom scenario can contain an optional `investments` list. Each entry is validated by `DepositInvestment` in the
+simulation models. The legacy `investment` key accepts either a single object or a list. For example:
 
 ```json
 {
   "scenarios": [{
     "name": "Invest then overpay",
-    "investment": [{
+    "investments": [{
       "initial_amount": "100000.00",
       "start_month": 1,
       "annual_rate": "0.06",

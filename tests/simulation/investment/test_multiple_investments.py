@@ -37,7 +37,7 @@ class TestMultipleInvestments:
         automatic = _deposit(term_count=None, mode=InvestmentMode.AUTOMATIC)
         # Act / Assert
         with pytest.raises(ValidationError, match=r"only one.*automatic"):
-            OverpaymentScenario(name="Two automatic entries", investment=(automatic, automatic))
+            OverpaymentScenario(name="Two automatic entries", investments=(automatic, automatic))
 
     def test_when_deposits_renew_expect_staggered_repayments(self) -> None:
         # Arrange
@@ -46,7 +46,7 @@ class TestMultipleInvestments:
             name="Monthly renewals",
             recurring_amount=Decimal("10"),
             recurring_start_month=1,
-            investment=(_deposit(contribution_months=2, term_months=12, term_count=2, annual_rate=ANNUAL_RATE),),
+            investments=(_deposit(contribution_months=2, term_months=12, term_count=2, annual_rate=ANNUAL_RATE),),
         )
         # Act
         result = simulate(terms, scenario)
@@ -73,7 +73,7 @@ class TestMultipleInvestments:
         # Arrange
         terms = _terms(principal="60000", horizon=horizon)
         scenario = OverpaymentScenario(
-            name="Final maturity", investment=(_deposit(contribution_months=2, term_months=12, term_count=2),)
+            name="Final maturity", investments=(_deposit(contribution_months=2, term_months=12, term_count=2),)
         )
         # Act / Assert
         if is_valid:
@@ -88,7 +88,7 @@ class TestMultipleInvestments:
         scenario = OverpaymentScenario(
             name="Paid before opening",
             lump_sums=(LumpSum(month=1, amount=terms.principal),),
-            investment=(_deposit(start_month=2, contribution_months=3, term_months=12, annual_rate=ANNUAL_RATE),),
+            investments=(_deposit(start_month=2, contribution_months=3, term_months=12, annual_rate=ANNUAL_RATE),),
         )
         # Act
         result = simulate(terms, scenario)
@@ -105,7 +105,7 @@ class TestMultipleInvestments:
         scenario = OverpaymentScenario(
             name="Paid during period",
             lump_sums=(LumpSum(month=payoff_month, amount=terms.principal),),
-            investment=(_deposit(contribution_months=4, term_months=12, term_count=2, annual_rate=ANNUAL_RATE),),
+            investments=(_deposit(contribution_months=4, term_months=12, term_count=2, annual_rate=ANNUAL_RATE),),
         )
         # Act
         result = simulate(terms, scenario)
@@ -128,7 +128,7 @@ class TestMultipleInvestments:
             recurring_amount=Decimal("100"),
             recurring_start_month=1,
             lump_sums=(LumpSum(month=payout_month, amount=Decimal("400")),),
-            investment=(_deposit(initial_amount=Decimal("1200")), _deposit(contribution_months=2)),
+            investments=(_deposit(initial_amount=Decimal("1200")), _deposit(contribution_months=2)),
         )
         # Act
         result = simulate(terms, scenario)
@@ -154,14 +154,14 @@ class TestMultipleInvestments:
         single = _deposit(initial_amount=immediate_capital, mode=InvestmentMode.AUTOMATIC, term_count=None)
         monthly = _deposit(contribution_months=3, term_months=2, annual_rate=ANNUAL_RATE)
         # Act
-        automatic = simulate(terms, OverpaymentScenario(name="Automatic", investment=(single, monthly)))
+        automatic = simulate(terms, OverpaymentScenario(name="Automatic", investments=(single, monthly)))
         # Assert
         # Immediate 9,000 + first scheduled 1,000 pays the mortgage before any monthly opening.
         # A delayed single payout leaves time for the first monthly deposit to earn interest.
         manual_by_count = {}
         for count in range(terms.analysis_horizon_months):
             fixed = single.model_copy(update={"mode": InvestmentMode.MANUAL, "term_count": count})
-            manual_by_count[count] = simulate(terms, OverpaymentScenario(name="Manual", investment=(fixed, monthly)))
+            manual_by_count[count] = simulate(terms, OverpaymentScenario(name="Manual", investments=(fixed, monthly)))
         assert len(automatic.investment_candidates) == len(manual_by_count)
         assert manual_by_count[0].summary.payoff_month == 1
         assert not any(deposit.investment_index == 2 for deposit in manual_by_count[0].investments)

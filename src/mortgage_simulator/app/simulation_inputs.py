@@ -124,7 +124,7 @@ def build_request(
                 cash_outflow_target=cash_outflow_target,
                 recurring_start_month=int(start_value) if start_value is not None else None,
                 lump_sums=tuple(lump_sums_by_scenario.get(name, [])),
-                investment=investments.get(name, ()) if investments else (),
+                investments=investments.get(name, ()) if investments else (),
             )
         )
     return SimulationRequest(terms=terms, scenarios=tuple(scenarios))
