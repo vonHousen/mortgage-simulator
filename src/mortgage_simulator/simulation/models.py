@@ -5,7 +5,7 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Annotated, Self
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 
 ZERO = Decimal("0")
 MAX_V1_HORIZON_MONTHS = 120
@@ -132,6 +132,7 @@ class DepositInvestment(FrozenModel):
     term_months: int = Field(gt=0)
     mode: InvestmentMode = InvestmentMode.MANUAL
     term_count: int | None = Field(default=None, ge=0)
+    contribution_months: int = Field(default=1, ge=1)
 
     @model_validator(mode="after")
     def validate_mode(self) -> Self:
@@ -140,6 +141,8 @@ class DepositInvestment(FrozenModel):
             raise ValueError("manual investment requires a term count")
         if self.mode == InvestmentMode.AUTOMATIC and self.term_count is not None:
             raise ValueError("automatic investment must not specify a term count")
+        if self.contribution_months > 1 and (self.term_count is None or self.term_count == 0):
+            raise ValueError("monthly deposits require a positive manual term count")
         return self
 
 
@@ -166,6 +169,25 @@ class InvestmentSummary(FrozenModel):
     terms: tuple[DepositTerm, ...]
 
 
+class InvestmentTotals(FrozenModel):
+    """Combined investment earnings and disposition for a scenario."""
+
+    gross_interest: Decimal
+    tax: Decimal
+    net_earnings: Decimal
+    applied_repayment: Decimal
+    retained_surplus: Decimal
+
+
+class DepositOutcome(FrozenModel):
+    """Disposition of the capital assigned to one deposit."""
+
+    investment_index: int
+    opening_month: int
+    initial_amount: Decimal
+    summary: InvestmentSummary
+
+
 def calculate_net_financing_cost(mortgage_cost: Decimal, net_earnings: Decimal) -> Decimal:
     """Subtract net deposit earnings from mortgage financing charges."""
     return mortgage_cost - net_earnings
@@ -179,11 +201,23 @@ class InvestmentCandidate(FrozenModel):
     total_mortgage_cost: Decimal
     ending_balance: Decimal
     investment: InvestmentSummary
+    other_net_earnings: Decimal = ZERO
+    other_retained_surplus: Decimal = ZERO
+
+    @property
+    def net_earnings(self) -> Decimal:
+        """Return total earnings across deposits for this timing."""
+        return self.investment.net_earnings + self.other_net_earnings
+
+    @property
+    def retained_surplus(self) -> Decimal:
+        """Return total surplus across deposits for this timing."""
+        return self.investment.retained_surplus + self.other_retained_surplus
 
     @property
     def net_financing_cost(self) -> Decimal:
         """Return mortgage cost minus net investment earnings."""
-        return calculate_net_financing_cost(self.total_mortgage_cost, self.investment.net_earnings)
+        return calculate_net_financing_cost(self.total_mortgage_cost, self.net_earnings)
 
 
 class OverpaymentScenario(FrozenModel):
@@ -194,7 +228,34 @@ class OverpaymentScenario(FrozenModel):
     cash_outflow_target: Decimal = Field(default=ZERO, ge=ZERO)
     recurring_start_month: int | None = Field(default=None, ge=1)
     lump_sums: tuple[LumpSum, ...] = ()
-    investment: DepositInvestment | None = None
+    investment: tuple[DepositInvestment, ...] | DepositInvestment | None = ()
+
+    @field_validator("investment", mode="before")
+    @classmethod
+    def normalize_investment(cls, value: object) -> object:
+        """Normalize legacy single-deposit input to the canonical collection.
+
+        Args:
+            value: Raw investment input, including a legacy object or null.
+        """
+        if value is None:
+            return ()
+        if isinstance(value, (dict, DepositInvestment)):
+            return (value,)
+        return value
+
+    @property
+    def deposit_entries(self) -> tuple[DepositInvestment, ...]:
+        """Return the validated deposit entries in configuration order."""
+        assert isinstance(self.investment, tuple)
+        return self.investment
+
+    @model_validator(mode="after")
+    def validate_automatic_timing(self) -> Self:
+        """Limit automatic timing to a single entry per scenario."""
+        if sum(entry.mode == InvestmentMode.AUTOMATIC for entry in self.deposit_entries) > 1:
+            raise ValueError("only one investment entry may use automatic timing")
+        return self
 
     @model_validator(mode="after")
     def validate_recurring_payment(self) -> Self:
@@ -222,9 +283,9 @@ class SimulationRequest(FrozenModel):
         if len(names) != len(set(names)):
             raise ValueError("scenario names must be unique")
         for scenario in self.scenarios:
-            investment = scenario.investment
-            if investment is not None:
-                maturity = investment.start_month + (investment.term_count or 0) * investment.term_months
+            for investment in scenario.deposit_entries:
+                last_opening = investment.start_month + investment.contribution_months - 1
+                maturity = last_opening + (investment.term_count or 0) * investment.term_months
                 if maturity > self.terms.analysis_horizon_months:
                     raise ValueError("investment start and maturity must be within the analysis horizon")
             if (
@@ -284,13 +345,40 @@ class SimulationResult(FrozenModel):
     summary: SimulationSummary
     investment: InvestmentSummary | None = None
     investment_candidates: tuple[InvestmentCandidate, ...] = ()
+    investments: tuple[DepositOutcome, ...] = ()
+
+    @property
+    def investment_totals(self) -> InvestmentTotals | None:
+        """Aggregate all realized deposit outcomes, including legacy results."""
+        summaries = tuple(item.summary for item in self.investments)
+        if not summaries:
+            if self.investment is None:
+                return None
+            summaries = (self.investment,)
+        return InvestmentTotals(
+            gross_interest=sum((item.gross_interest for item in summaries), ZERO),
+            tax=sum((item.tax for item in summaries), ZERO),
+            net_earnings=sum((item.net_earnings for item in summaries), ZERO),
+            applied_repayment=sum((item.applied_repayment for item in summaries), ZERO),
+            retained_surplus=sum((item.retained_surplus for item in summaries), ZERO),
+        )
+
+    @property
+    def net_investment_earnings(self) -> Decimal:
+        """Return realized after-tax earnings from all deposits."""
+        totals = self.investment_totals
+        return totals.net_earnings if totals else ZERO
+
+    @property
+    def retained_investment_surplus(self) -> Decimal:
+        """Return deposit proceeds retained outside the mortgage."""
+        totals = self.investment_totals
+        return totals.retained_surplus if totals else ZERO
 
     @property
     def net_financing_cost(self) -> Decimal:
         """Return mortgage cost minus net investment earnings, if present."""
-        return calculate_net_financing_cost(
-            self.summary.total_mortgage_cost, self.investment.net_earnings if self.investment else ZERO
-        )
+        return calculate_net_financing_cost(self.summary.total_mortgage_cost, self.net_investment_earnings)
 
 
 class ScenarioComparison(FrozenModel):

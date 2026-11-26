@@ -89,10 +89,11 @@ Core input types:
 - `SubsidyTerms`: subsidy enablement, required first-period `coefficient`, required `second_coefficient`, and shared
   subsidized reference rate.
 - `OverpaymentScenario`: unique name, either an optional fixed recurring amount or cash-outflow target with a start
-  month, zero or more lump sums, and an optional `DepositInvestment`.
+  month, zero or more lump sums, and zero or more `DepositInvestment` entries.
 - `LumpSum`: payment month and amount.
 
-`DepositInvestment` describes capital, start month, annual gross rate, term length, and manual or automatic timing.
+`DepositInvestment` describes capital, start month, annual gross rate, term length, manual or automatic timing,
+and an optional number of monthly openings. Automatic timing is available for one single-deposit entry per scenario.
 Automatic investment timing uses exhaustive search over all full-term maturities inside the horizon, including
 immediate overpayment, minimizing Net financing cost with completion-month and term-count tie-breaks.
 The investment package evaluates deposit-funded balloon repayments through the same mortgage calculator; the mortgage
@@ -136,7 +137,8 @@ For month `m`:
 9. Calculate cash outflow and closing balance.
 10. Stop after payoff or the configured analysis horizon, whichever occurs first.
 
-Investment evaluation appends the deposit-funded balloon after existing lump sums, so it is applied before horizon settlement.
+Investment evaluation appends monthly deposit payouts and then single-deposit payouts after existing lump sums.
+All deposit-funded payouts are applied before horizon settlement.
 
 The scheduled monthly principal is `initial principal ÷ contractual term in months` because the workbook uses equal-principal installments.
 
@@ -242,7 +244,7 @@ A scenario editor supports multiple named scenarios with `name`, `strategy`, `re
 fields. Each row chooses either Fixed overpayment or Constant cash outflow. A second editor assigns optional lump sums
 by scenario and month. New sessions initialize both editors from optional local scenario defaults; later UI edits take
 precedence for that session and are not written back to disk. A dedicated **Invest before overpaying** section attaches
-one deposit to a custom scenario using Add, Edit, Remove, Apply, and Cancel controls. Pending investment edits must
+single deposits and monthly deposit series to a custom scenario using Add, Edit, Remove, Apply, and Cancel controls. Pending investment edits must
 be applied or cancelled before simulation. Submitting the form validates the entire run and then
 calculates the baseline and all custom scenarios.
 

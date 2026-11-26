@@ -18,5 +18,7 @@ schedule that starts in the past, ask whether to use a modeled balance or wait f
 question into equal-funded strategies when appropriate, and explain the payment date, balance source, and
 differences with links to generated artifacts.
 
-Follow the workflow's links to existing configuration and model documentation as needed. Use the shared executable
+Follow the workflow's links to existing configuration and model documentation as needed. For multiple deposits or monthly openings and renewals, follow the [worked investment list](../../../docs/11-cli-simulations.md#example-mix-up-front-and-monthly-deposits). Inspect the generated request schema and the deposit and maturity exports.
+
+Use the shared executable
 through Just rather than creating calculation scripts or starting Streamlit.

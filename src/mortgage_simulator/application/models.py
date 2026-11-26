@@ -7,8 +7,10 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 from mortgage_simulator.simulation.models import (
     ComparisonReport,
+    DepositOutcome,
     InvestmentCandidate,
     InvestmentSummary,
+    InvestmentTotals,
     OverpaymentScenario,
     SimulationSummary,
 )
@@ -33,6 +35,8 @@ class ScenarioOutcome(BaseModel):
     net_financing_cost: Decimal
     investment: InvestmentSummary | None
     investment_candidates: tuple[InvestmentCandidate, ...]
+    investments: tuple[DepositOutcome, ...] = ()
+    investment_totals: InvestmentTotals | None = None
 
 
 class RunReport(BaseModel):

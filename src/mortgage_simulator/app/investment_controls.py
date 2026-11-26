@@ -7,23 +7,36 @@ import polars as pl
 import streamlit as st
 from pydantic import ValidationError
 
-from mortgage_simulator.simulation.models import DepositInvestment, InvestmentMode, MortgageTerms
+from mortgage_simulator.simulation.models import (
+    DepositInvestment,
+    InvestmentMode,
+    MortgageTerms,
+    OverpaymentScenario,
+    SimulationRequest,
+)
 
 INVESTMENTS_KEY = "scenario_investments"
 DRAFT_KEY = "investment_draft"
 
 
-def get_investments() -> dict[str, DepositInvestment]:
+def get_investments() -> dict[str, tuple[DepositInvestment, ...]]:
     """Return applied deposit settings keyed by scenario name."""
-    return cast(dict[str, DepositInvestment], st.session_state[INVESTMENTS_KEY])
+    return cast(dict[str, tuple[DepositInvestment, ...]], st.session_state[INVESTMENTS_KEY])
 
 
 def render_investment_controls(names: list[str], terms: MortgageTerms) -> bool:
-    """Render deposit management for scenario names and terms; return whether edits are pending."""
+    """Render deposit management and return whether edits or references are pending.
+
+    Args:
+        names: Current custom scenario names.
+        terms: Mortgage terms used for horizon validation.
+    """
     investments = get_investments()
+    draft_open = DRAFT_KEY in st.session_state
+    entries = [(name, index) for name, items in investments.items() for index in range(len(items))]
     with st.container(border=True):
         st.subheader("Invest before overpaying")
-        st.caption("Invest a lump sum, renew after tax, then use the balance to repay your mortgage.")
+        st.caption("Add single deposits or open a new deposit each month for a set period.")
         with st.expander("How to compare investing and overpaying"):
             st.markdown(
                 "Create a named scenario above, then attach an investment. Keep the same starting capital and "
@@ -46,13 +59,17 @@ def render_investment_controls(names: list[str], terms: MortgageTerms) -> bool:
                     [
                         {
                             "Scenario": name,
+                            "Entry": index + 1,
+                            "First opening": item.start_month,
+                            "Monthly openings": item.contribution_months,
                             "Capital (PLN)": float(item.initial_amount),
                             "Annual gross rate (%)": float(item.annual_rate * 100),
                             "Term (months)": item.term_months,
                             "Mode": item.mode.value,
                             "Terms before repayment": item.term_count,
                         }
-                        for name, item in investments.items()
+                        for name, items in investments.items()
+                        for index, item in enumerate(items)
                     ]
                 ),
                 hide_index=True,
@@ -60,25 +77,33 @@ def render_investment_controls(names: list[str], terms: MortgageTerms) -> bool:
             )
         else:
             st.info("Add an investment to compare overpaying now with investing first.")
-        available = [name for name in names if name not in investments]
-        selected = st.selectbox("Investment to manage", list(investments), disabled=not investments)
+        selected = st.selectbox(
+            "Investment to manage",
+            entries,
+            format_func=lambda entry: f"{entry[0]} · Investment {entry[1] + 1}",
+            disabled=not entries,
+        )
         with st.container(horizontal=True):
-            if st.button("Add investment", disabled=not available):
-                _open_draft(available[0], None)
-            if st.button("Edit investment", disabled=selected is None):
+            if st.button("Add investment", disabled=not names or draft_open):
+                _open_draft(names[0])
+            if st.button("Edit investment", disabled=selected is None or draft_open):
                 assert selected is not None
-                _open_draft(selected, investments[selected])
-            if st.button("Remove investment", disabled=selected is None):
+                name, index = selected
+                _open_draft(name, index, investments[name][index])
+            if st.button("Remove investment", disabled=selected is None or draft_open):
                 assert selected is not None
-                del investments[selected]
+                _remove_entry(*selected)
                 st.rerun()
         if DRAFT_KEY in st.session_state:
             _render_draft(names, terms)
     return DRAFT_KEY in st.session_state or bool(set(investments) - set(names))
 
 
-def _open_draft(name: str, investment: DepositInvestment | None) -> None:
-    st.session_state[DRAFT_KEY] = name
+def _open_draft(name: str, index: int | None = None, investment: DepositInvestment | None = None) -> None:
+    st.session_state[DRAFT_KEY] = (name, index)
+    monthly = investment is not None and investment.contribution_months > 1
+    st.session_state["deposit_kind"] = "Monthly deposits" if monthly else "Single deposit"
+    st.session_state["deposit_openings"] = investment.contribution_months if monthly and investment else 2
     st.session_state["deposit_scenario"] = name
     st.session_state["deposit_capital"] = float(investment.initial_amount) if investment else 10000.0
     st.session_state["deposit_start"] = investment.start_month if investment else 1
@@ -90,19 +115,34 @@ def _open_draft(name: str, investment: DepositInvestment | None) -> None:
 
 def _render_draft(names: list[str], terms: MortgageTerms) -> None:
     st.markdown("**Investment settings**")
-    original = cast(str, st.session_state[DRAFT_KEY])
-    choices = [name for name in names if name == original or name not in get_investments()]
+    original, index = cast(tuple[str, int | None], st.session_state[DRAFT_KEY])
+    choices = names.copy()
     if original not in choices:
         choices.insert(0, original)
     name = st.selectbox("Scenario for investment", choices, key="deposit_scenario", persist_state="session")
+    kind = st.segmented_control(
+        "Investment type",
+        ["Single deposit", "Monthly deposits"],
+        key="deposit_kind",
+        required=True,
+        persist_state="session",
+    )
+    monthly = kind == "Monthly deposits"
+    openings = (
+        st.number_input(
+            "Number of monthly openings", min_value=2, step=1, key="deposit_openings", persist_state="session"
+        )
+        if monthly
+        else 1
+    )
     left, right = st.columns(2)
     with left:
         capital = st.number_input(
-            "Initial capital (PLN)",
+            "Amount per deposit (PLN)" if monthly else "Initial capital (PLN)",
             min_value=0.01,
             step=1000.0,
             key="deposit_capital",
-            help="Capital allocated once, either to immediate repayment or to the deposit.",
+            help="Each opening uses this amount of new capital.",
             persist_state="session",
         )
         start = st.number_input(
@@ -131,30 +171,49 @@ def _render_draft(names: list[str], terms: MortgageTerms) -> None:
             persist_state="session",
         )
         st.caption(f"{term // 12} years, {term % 12} months. Interest credited only at maturity.")
-    mode = st.segmented_control(
-        "Repayment timing",
-        ["manual", "automatic"],
-        key="deposit_mode",
-        required=True,
-        format_func=str.title,
-        persist_state="session",
+    mode = (
+        "manual"
+        if monthly
+        else st.segmented_control(
+            "Repayment timing",
+            ["manual", "automatic"],
+            key="deposit_mode",
+            required=True,
+            format_func=str.title,
+            persist_state="session",
+        )
     )
     count = st.number_input(
-        "Terms before repayment (0 = immediate)",
+        "Terms before repayment" if monthly else "Terms before repayment (0 = immediate)",
         min_value=0,
         step=1,
-        help="Repayment month = Investment start month + Terms before repayment x Deposit term (months).",
+        help="Each deposit renews until it completes this many terms or the mortgage is paid off.",
         key="deposit_count",
         disabled=mode == "automatic",
         persist_state="session",
     )
     if mode == "manual":
         maturity = start + count * term
-        month_index = terms.first_payment_date.year * 12 + terms.first_payment_date.month - 1 + maturity - 1
-        year, month = divmod(month_index, 12)
-        st.caption(
-            f"Planned repayment: month {maturity} ({year:04d}-{month + 1:02d}-{terms.first_payment_date.day:02d})."
-        )
+        last_opening = start + openings - 1
+        last_maturity = maturity + openings - 1
+        if monthly:
+            st.caption(
+                f"Planned openings: months {start} to {last_opening}. "
+                f"Planned payouts: months {maturity} to {last_maturity}."
+            )
+            if count < 1:
+                st.warning("Monthly deposits require at least one term.")
+        else:
+            month_index = terms.first_payment_date.year * 12 + terms.first_payment_date.month - 1 + maturity - 1
+            year, month = divmod(month_index, 12)
+            st.caption(
+                f"Planned repayment: month {maturity} ({year:04d}-{month + 1:02d}-{terms.first_payment_date.day:02d})."
+            )
+        if last_maturity > terms.analysis_horizon_months:
+            st.warning(
+                f"The final payout in month {last_maturity} exceeds the "
+                f"horizon of {terms.analysis_horizon_months} months."
+            )
     else:
         st.caption(
             "Compare immediate repayment and every maturity within the horizon. Minimize Net "
@@ -171,18 +230,34 @@ def _render_draft(names: list[str], terms: MortgageTerms) -> None:
                     term_months=term,
                     mode=InvestmentMode(mode or "manual"),
                     term_count=count if mode == "manual" else None,
+                    contribution_months=openings,
                 )
-                if start + (item.term_count or 0) * term > terms.analysis_horizon_months:
-                    raise ValueError("Investment start and maturity must fit within the analysis horizon.")
                 if name not in names:
                     raise ValueError("Choose an existing scenario.")
+                entries = list(get_investments().get(name, ()))
+                if name == original and index is not None:
+                    entries[index] = item
+                else:
+                    entries.append(item)
+                SimulationRequest(terms=terms, scenarios=(OverpaymentScenario(name=name, investment=tuple(entries)),))
             except (ValidationError, ValueError) as error:
                 st.error(str(error))
             else:
-                get_investments().pop(original, None)
-                get_investments()[name] = item
+                if index is not None and name != original:
+                    _remove_entry(original, index)
+                get_investments()[name] = tuple(entries)
                 del st.session_state[DRAFT_KEY]
                 st.rerun()
         if st.button("Cancel"):
             del st.session_state[DRAFT_KEY]
             st.rerun()
+
+
+def _remove_entry(name: str, index: int) -> None:
+    investments = get_investments()
+    items = investments[name]
+    remaining = (*items[:index], *items[index + 1 :])
+    if remaining:
+        investments[name] = remaining
+    else:
+        del investments[name]

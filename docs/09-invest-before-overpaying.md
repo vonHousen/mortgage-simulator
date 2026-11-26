@@ -3,8 +3,8 @@
 ## What this compares
 
 Use this feature to answer: **Should I overpay X PLN now, or invest that same capital and overpay later?**
-A deposit belongs to a custom mortgage scenario. Its entire balance, including interest after tax, funds a balloon
-repayment. Existing recurring overpayments and balloons continue alongside it.
+A custom mortgage scenario can contain several deposits. Each deposit uses its balance, including after-tax interest,
+to fund a balloon repayment. Recurring overpayments and other lump sums continue alongside them.
 
 Useful comparisons include:
 
@@ -28,12 +28,35 @@ are illustrative inputs, not application defaults or bank offers.
    timing and the other candidates. Download the investment ledger and repayment candidates separately from the
    mortgage schedule CSV.
 
-Use **Edit investment** to change applied settings or **Remove investment** to detach them. A scenario has at most
-one investment. Resolve investment assignments if you rename or remove the associated scenario.
+Use **Edit investment** or **Remove investment** on an individual entry. Resolve investment assignments if you
+rename or remove the associated scenario. One single-deposit entry per scenario may use automatic timing.
 
 To compare manually, create scenarios with identical mortgage overpayments and investment inputs, changing only
 **Terms before repayment**: zero for immediate repayment, one for the first maturity, two for one renewal, and so on.
 Automatic mode performs this timing comparison within one scenario; the term-count input is disabled in that mode.
+
+## Example: up-front and monthly deposits together
+
+Use mortgage terms with an analysis horizon of at least **36 months**. The amounts and rates below are illustrative.
+
+1. On **Overpayment scenarios**, add a scenario named **Up-front and monthly deposits**. Select **Fixed overpayment**,
+   enter **1,000 PLN**, and set **Starting month** to **1**.
+2. Select **Add investment**, choose that scenario and **Single deposit**, then enter **100,000 PLN**, start month
+   **1**, a **6%** gross annual rate, and a **3-month** term. Select **Manual**, enter **1** term, and apply.
+3. Select **Add investment** again, choose the same scenario and **Monthly deposits**, then enter **1,000 PLN**
+   per deposit, start month **1**, **12** monthly openings, a **10%** gross annual rate, and a **12-month** term.
+   Enter **2** terms before repayment to renew each deposit once. The preview shows openings in months **1–12**
+   and planned payouts in months **25–36**. Apply and run the simulation.
+4. Check the monthly mortgage schedule for recurring overpayments and the up-front deposit's payout in month **4**,
+   if the mortgage is still open. In **Investment outcome**, follow each monthly deposit by entry and opening
+   month. Check its first maturity in the term ledger and its repayment and surplus in the deposit outcomes table.
+
+Use a monthly series for two or more planned openings. The contribution period controls how many deposits open. The term length controls how long each deposit runs
+before earning interest, and the term count controls how many times that same balance rolls over before payout.
+If the mortgage pays off early, new monthly deposits and renewals stop. Deposits already open finish their current
+term and you retain their unused proceeds. Money earmarked for future monthly contributions stays in cash.
+
+See the [equivalent CLI request](11-cli-simulations.md#example-mix-up-front-and-monthly-deposits).
 
 ## Timing and interest
 
@@ -77,16 +100,16 @@ annual compounding events.
 
 Automatic mode uses **exhaustive search (brute force)** over eligible deposit term counts. It keeps initial capital,
 opening month, annual gross rate, term length, and existing mortgage payments fixed; only the planned number of
-terms before repayment changes.
+terms before repayment changes. Any other entries keep their configured inputs. Each candidate is ranked using
+its own actual deposit openings, renewals, repayments, and combined net earnings.
 
 For opening month `T`, term length `M`, and analysis horizon `H`, candidates are all integer counts from zero through
 `floor((H - T) / M)`, inclusive. Count zero means immediate overpayment; positive counts target month `T + count × M`.
 For example, `T = 1`, `M = 3`, and `H = 12` produces counts 0, 1, 2, and 3: repayment months 1, 4, 7, and 10.
 
-The evaluator first calculates the mortgage without investment funds to identify payoff caused by other payments.
-For each candidate, it calculates deposit maturities, tax, and renewals, then calculates the mortgage with the
-available deposit balance added as a balloon. If other payments have already paid off the mortgage, no additional
-mortgage calculation is needed for that candidate. Early payoff stops renewals as described below.
+For each candidate, the evaluator projects the deposit payouts and calculates the resulting mortgage schedule.
+Its payoff month determines which deposits actually open and which renewals complete. A deposit whose current term
+finishes after payoff returns its balance as retained surplus.
 
 Candidates are sorted by Net financing cost, effective completion month, and planned term count, in that order.
 The first candidate is recommended; the others remain available for inspection and CSV download. Manual mode uses
@@ -97,10 +120,9 @@ It does not search different capital amounts, opening dates, rates, term lengths
 or model discounted household wealth. Net investment earnings enter the objective once; retained surplus is shown
 separately and is not deducted again.
 
-The search space is small within the supported horizon. Its size is `floor((H - T) / M) + 1`; the authoritative
+The search evaluates one automatic entry within the supported horizon. Its size is `floor((H - T) / M) + 1`; the authoritative
 horizon limit lives in [`simulation/models.py`](../src/mortgage_simulator/simulation/models.py). Each candidate requires
-at most one mortgage schedule and up to its selected number of deposit terms, making exhaustive comparison practical
-without a heuristic optimizer. Candidate enumeration and selection live in
+one mortgage schedule and the term calculations for its configured deposits. Candidate enumeration and selection live in
 [`investment/evaluation.py`](../src/mortgage_simulator/simulation/investment/evaluation.py).
 
 ## Reading the comparison
@@ -122,8 +144,9 @@ worked examples, the distinction between principal and financing charges, and co
 
 ## Early payoff and surplus
 
-Existing mortgage payments are applied first, then the investment-funded balloon, then any terminal horizon
-settlement. The balloon is capped at the remaining balance.
+Existing mortgage payments are applied first, then monthly deposit payouts, single-deposit payouts, and any
+terminal horizon settlement. Payouts within either deposit group use configuration order. Each payment is capped
+at the remaining balance.
 
 - If 102,444.76 PLN is available but only 80,000 PLN of debt remains after other payments, 80,000 PLN repays the
   mortgage and 22,444.76 PLN remains as retained surplus.
@@ -134,7 +157,10 @@ settlement. The balloon is capped at the remaining balance.
 
 ## JSON configuration
 
-This complete example seeds three equivalent capital allocations with different repayment timings:
+Each scenario can use an `investment` list. Existing single-object configurations such as the example below also
+load. For a list that combines single and monthly deposits, see the [CLI example](11-cli-simulations.md#example-mix-up-front-and-monthly-deposits).
+
+This example seeds three equivalent capital allocations with different repayment timings:
 
 ```json
 {

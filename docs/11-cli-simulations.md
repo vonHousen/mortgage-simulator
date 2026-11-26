@@ -108,6 +108,60 @@ read the modeled opening balance from the baseline row in `mortgage-schedules.cs
 eligibility is unclear or the baseline has no row for that date, clarify before reporting a comparison. Report the
 balance source, payment date, and difference in Net financing cost between the two strategies.
 
+## Example: mix up-front and monthly deposits
+
+Save this request as `data/requests/mixed-deposits.json`. Use a saved mortgage profile with an analysis horizon of
+at least 36 months. All amounts and rates are illustrative. This request matches the
+[Streamlit example](09-invest-before-overpaying.md#example-up-front-and-monthly-deposits-together).
+
+```json
+{
+  "scenarios": [
+    {
+      "name": "Up-front and monthly deposits",
+      "recurring_amount": "1000",
+      "recurring_start_month": 1,
+      "investment": [
+        {
+          "initial_amount": "100000",
+          "start_month": 1,
+          "annual_rate": "0.06",
+          "term_months": 3,
+          "mode": "manual",
+          "term_count": 1
+        },
+        {
+          "initial_amount": "1000",
+          "start_month": 1,
+          "annual_rate": "0.10",
+          "contribution_months": 12,
+          "term_months": 12,
+          "mode": "manual",
+          "term_count": 2
+        }
+      ]
+    }
+  ]
+}
+```
+
+```bash
+mkdir -p data/runs
+just simulate data/requests/mixed-deposits.json data/runs/mixed-deposits-001 data/config/my-mortgage.json
+just simulate data/runs/mixed-deposits-001/resolved-request.json data/runs/mixed-deposits-002
+```
+
+Month 1 is the first mortgage payment month. The up-front deposit is due to pay out in month 4. The second entry
+opens a fresh deposit per month for 12 months. Each of those deposits has two 12-month terms, so the first payout
+is planned for month 25 and the last for month 36. After mortgage payoff, no new monthly deposits or renewals
+start. Deposits in progress finish their terms and return unused proceeds as retained surplus.
+
+Check `investment-deposits.csv` for capital, applied repayments, and retained surplus for each deposit. Its
+`opening_month` is the planned opening month. Immediate repayment or earlier payoff can leave a single deposit
+with no credited terms.
+Use `investment-ledger.csv` to see each credited maturity, including renewals, and `mortgage-schedules.csv`
+to see how the payouts and recurring overpayments affected the mortgage.
+
 ## Run and replay
 
 ```bash
@@ -134,7 +188,8 @@ A successful command prints one JSON report to standard output and writes:
 | `resolved-request.json` | Effective terms and custom scenarios for replay. |
 | `results.json` | Scenario summaries, baseline-relative comparisons, investment outcomes and candidates, artifact paths. |
 | `mortgage-schedules.csv` | All baseline and custom monthly payment records, including exact dates. |
-| `investment-ledger.csv` | Credited maturity rows, when any exist, tagged by scenario. |
+| `investment-ledger.csv` | Credited maturity rows, when any exist, tagged by scenario, entry, and opening month. |
+| `investment-deposits.csv` | Individual deposit outcomes, including capital, earnings, repayment, and surplus. |
 | `investment-candidates.csv` | Available timing candidates, when any exist, tagged by scenario and ranked by the engine. |
 
 JSON uses decimal strings and ISO dates. The report omits monthly mortgage rows to keep the response compact; use the

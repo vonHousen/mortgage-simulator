@@ -8,7 +8,11 @@ import polars as pl
 from pydantic import ValidationError
 
 from mortgage_simulator.application.models import BASELINE_NAME, ComparisonInput, RunReport, ScenarioOutcome
-from mortgage_simulator.reporting.investment_schedules import investment_candidates_frame, investment_ledger_frame
+from mortgage_simulator.reporting.investment_schedules import (
+    deposit_outcomes_frame,
+    investment_candidates_frame,
+    investment_ledger_frame,
+)
 from mortgage_simulator.reporting.payment_schedules import schedule_csv
 from mortgage_simulator.reporting.scenario_comparison import compare
 from mortgage_simulator.settings import AppSettings, mortgage_terms_draft
@@ -125,7 +129,8 @@ def run_comparison(request: Path, output: Path, profile: Path | None = None) -> 
     report = RunReport(
         results=tuple(
             ScenarioOutcome.model_validate(
-                result.model_dump(exclude={"payments"}) | {"net_financing_cost": result.net_financing_cost}
+                result.model_dump(exclude={"payments"})
+                | {"net_financing_cost": result.net_financing_cost, "investment_totals": result.investment_totals}
             )
             for result in results
         ),
@@ -154,6 +159,7 @@ def _csv_exports(results: tuple[SimulationResult, ...]) -> dict[str, str]:
     exports = {"mortgage-schedules.csv": schedule_csv(results)}
     for filename, projection in (
         ("investment-ledger.csv", investment_ledger_frame),
+        ("investment-deposits.csv", deposit_outcomes_frame),
         ("investment-candidates.csv", investment_candidates_frame),
     ):
         frames = [frame for result in results if not (frame := projection(result)).is_empty()]

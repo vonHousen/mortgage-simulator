@@ -55,7 +55,8 @@ with st.container(border=True):
         key="lump_sum_editor",
     )
 
-pending_investment = render_investment_controls(scenario_data.get_column("name").to_list(), terms)
+scenario_names = [name for name in scenario_data.get_column("name").str.strip_chars().drop_nulls().to_list() if name]
+pending_investment = render_investment_controls(scenario_names, terms)
 if pending_investment:
     st.caption("Apply or cancel investment edits and resolve scenario references before running.")
 
@@ -68,12 +69,9 @@ if st.button("Run simulation", type="primary", icon=":material/play_arrow:", dis
             terms,
             scenario_data,  # ty: ignore[invalid-argument-type]  # Streamlit misidentifies Polars frames.
             lump_sum_data,  # ty: ignore[invalid-argument-type]  # Streamlit misidentifies Polars frames.
+            get_investments(),
         )
-        scenarios = tuple(
-            scenario.model_copy(update={"investment": get_investments().get(scenario.name)})
-            for scenario in request.scenarios
-        )
-        results = tuple(simulate(request.terms, scenario) for scenario in scenarios)
+        results = tuple(simulate(request.terms, scenario) for scenario in request.scenarios)
     except (InvalidOperation, KeyError, TypeError, ValueError, ValidationError) as error:
         st.error(f"Invalid simulation input: {error}", icon=":material/error:")
     else:

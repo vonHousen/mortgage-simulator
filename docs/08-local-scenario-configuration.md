@@ -49,21 +49,21 @@ tooltips, calculations, reports, tables, totals, and CSV exports. The current pr
 
 ## Deposit-funded overpayments
 
-A custom scenario can contain an optional `investment` object. Its validated fields are defined by
-`DepositInvestment` in the simulation models. For example:
+A custom scenario can contain an optional `investment` list. Each entry is validated by `DepositInvestment` in the
+simulation models. Single-object inputs also load. For example:
 
 ```json
 {
   "scenarios": [{
     "name": "Invest then overpay",
-    "investment": {
+    "investment": [{
       "initial_amount": "100000.00",
       "start_month": 1,
       "annual_rate": "0.06",
       "term_months": 3,
       "mode": "manual",
       "term_count": 2
-    }
+    }]
   }]
 }
 ```
@@ -91,6 +91,8 @@ pending edits before Run simulation. Results display the maturity ledger, retain
 with separate investment CSV downloads. JSON seeds a fresh session; changing the file does not replace an existing
 session's edits.
 
-See [Invest before overpaying](09-invest-before-overpaying.md) for use cases and worked deposit examples.
+See the [worked investment list](11-cli-simulations.md#example-mix-up-front-and-monthly-deposits) for monthly deposits
+with renewals. Use its `scenarios` array in the local file. The [Streamlit walkthrough](09-invest-before-overpaying.md#example-up-front-and-monthly-deposits-together)
+shows how to create the same scenario interactively.
 
 See [Understanding the metrics](10-understanding-metrics.md) for payment, cost, earnings, and surplus definitions.

@@ -914,10 +914,65 @@ class TestInvestmentControls:
         next(button for button in app.button if button.label == "Apply investment").click().run()
         # Assert
         assert not app.exception
-        item = app.session_state[INVESTMENTS_KEY]["Overpayment"]
+        (item,) = app.session_state[INVESTMENTS_KEY]["Overpayment"]
         assert item.initial_amount == Decimal("25000")
         assert item.annual_rate == Decimal("0.06")
         assert not next(button for button in app.button if button.label == "Run simulation").disabled
+
+    def test_when_monthly_deposits_are_added_expect_preview_and_upfront_deposit_to_remain(self) -> None:
+        # Arrange
+        terms = default_mortgage_terms(analysis_horizon_months=36)
+        app = _scenarios_app(terms=terms, lump_sum_amount=None)
+        app.session_state[SCENARIOS_KEY] = app.session_state[SCENARIOS_KEY].with_columns(
+            pl.lit(" Overpayment ").alias("name")
+        )
+        app.run()
+        next(button for button in app.button if button.label == "Add investment").click().run()
+        app.number_input(key="deposit_capital").set_value(100000.0)
+        app.number_input(key="deposit_rate").set_value(6.0)
+        next(button for button in app.button if button.label == "Apply investment").click().run()
+        (upfront,) = app.session_state[INVESTMENTS_KEY]["Overpayment"]
+
+        # Act
+        next(button for button in app.button if button.label == "Add investment").click().run()
+        app.segmented_control(key="deposit_kind").set_value("Monthly deposits").run()
+        app.number_input(key="deposit_capital").set_value(1000.0)
+        app.number_input(key="deposit_openings").set_value(12)
+        app.number_input(key="deposit_term").set_value(12)
+        app.number_input(key="deposit_rate").set_value(10.0)
+        app.number_input(key="deposit_count").set_value(2).run()
+
+        # Assert
+        assert not app.exception
+        assert any("months 1 to 12" in caption.value and "months 25 to 36" in caption.value for caption in app.caption)
+
+        # Act
+        app.number_input(key="deposit_count").set_value(3).run()
+        next(button for button in app.button if button.label == "Apply investment").click().run()
+
+        # Assert
+        assert any("month 48" in warning.value and "36 months" in warning.value for warning in app.warning)
+        assert any("analysis horizon" in error.value for error in app.error)
+        assert app.session_state[INVESTMENTS_KEY]["Overpayment"] == (upfront,)
+
+        # Act
+        app.number_input(key="deposit_count").set_value(2).run()
+        next(button for button in app.button if button.label == "Apply investment").click().run()
+        next(button for button in app.button if button.label == "Run simulation").click().run()
+
+        # Assert
+        assert not app.error
+        saved_upfront, monthly = app.session_state[INVESTMENTS_KEY]["Overpayment"]
+        assert saved_upfront == upfront
+        assert monthly.initial_amount == Decimal("1000")
+        assert monthly.contribution_months == 12
+        assert monthly.term_months == 12
+        assert monthly.term_count == 2
+        result: SimulationResult = app.session_state[RESULTS_KEY][1]
+        assert len(result.investments) == 13
+        assert result.payments[3].lump_sum == Decimal("101215.00")
+        assert result.payments[24].lump_sum == Decimal("1168.56")
+        assert result.payments[24].recurring_overpayment == Decimal("1000")
 
     def test_add_when_cancelled_expect_no_investment(self) -> None:
         # Arrange

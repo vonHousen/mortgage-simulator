@@ -33,8 +33,8 @@ def compare(results: Sequence[SimulationResult]) -> ComparisonReport:
         ScenarioComparison(
             scenario_name=result.scenario_name,
             summary=result.summary,
-            net_investment_earnings=result.investment.net_earnings if result.investment else ZERO,
-            retained_surplus=result.investment.retained_surplus if result.investment else ZERO,
+            net_investment_earnings=result.net_investment_earnings,
+            retained_surplus=result.retained_investment_surplus,
             net_financing_cost_delta=result.net_financing_cost - results[0].net_financing_cost,
             cash_outflow_delta=result.summary.total_cash_outflow - baseline.total_cash_outflow,
             interest_delta=result.summary.total_interest - baseline.total_interest,

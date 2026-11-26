@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 from decimal import Decimal
+from io import StringIO
 from pathlib import Path
 
 import pytest
@@ -128,6 +129,132 @@ class TestHeadlessCli:
         replayed_report = RunReport.model_validate_json(replay.stdout)
         assert replayed_report.results == report.results
         assert replayed_report.comparison == report.comparison
+
+    def test_when_mixed_investments_expect_gui_cli_and_replay_parity(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("MS_SCENARIOS__BASELINE_NAME", "Baseline")
+        terms = default_mortgage_terms(analysis_horizon_months=36)
+        scenarios = [
+            {
+                "name": "Mixed investments",
+                "recurring_amount": "1000",
+                "recurring_start_month": 1,
+                "investment": [
+                    {
+                        "initial_amount": "100000",
+                        "start_month": 1,
+                        "annual_rate": "0.05",
+                        "term_months": 12,
+                        "mode": "automatic",
+                    },
+                    {
+                        "initial_amount": "1000",
+                        "start_month": 1,
+                        "annual_rate": "0.10",
+                        "term_months": 12,
+                        "term_count": 2,
+                        "contribution_months": 12,
+                    },
+                ],
+            }
+        ]
+        settings_file = tmp_path / "scenarios.json"
+        settings_file.write_text(json.dumps({"scenarios": scenarios}))
+        monkeypatch.setenv("MS_SCENARIOS__CONFIG_PATH", str(settings_file))
+        request = tmp_path / "request.json"
+        request.write_text(json.dumps({"terms": terms.model_dump(mode="json"), "scenarios": scenarios}))
+        output = tmp_path / "first"
+
+        # Act
+        gui = AppTest.from_file(ROOT / "src/mortgage_simulator/app/streamlit_app.py").run()
+        gui.session_state[TERMS_KEY] = terms
+        gui.switch_page("app_pages/overpayment_scenarios.py").run()
+        next(button for button in gui.button if button.label == "Run simulation").click().run()
+        completed = _cli("run", "--request", str(request), "--output", str(output))
+
+        # Assert
+        assert not gui.error
+        assert not gui.exception
+        assert completed.returncode == 0, completed.stderr
+        report = RunReport.model_validate_json(completed.stdout)
+        gui_results: tuple[SimulationResult, ...] = gui.session_state[RESULTS_KEY]
+        gui_mixed = gui_results[1]
+        cli_mixed = report.results[1]
+        assert cli_mixed.summary == gui_mixed.summary
+        assert cli_mixed.investments == gui_mixed.investments
+        assert cli_mixed.investment_totals == gui_mixed.investment_totals
+        assert cli_mixed.investment_candidates == gui_mixed.investment_candidates
+        assert cli_mixed.net_financing_cost == gui_mixed.net_financing_cost
+        assert report.comparison == compare(gui_results)
+        with report.artifacts["mortgage_schedules"].open() as stream:
+            cli_schedule = list(csv.DictReader(stream))
+        gui_schedule = list(csv.DictReader(StringIO(schedule_csv(gui_results))))
+        for cli_row, gui_row in zip(cli_schedule, gui_schedule, strict=True):
+            assert cli_row["scenario"] == gui_row["scenario"]
+            assert cli_row["payment_date"] == gui_row["payment_date"]
+            for column in cli_row.keys() - {"scenario", "payment_date"}:
+                assert Decimal(cli_row[column]) == Decimal(gui_row[column])
+
+        ledger_csv = report.artifacts["investment_ledger"]
+        with ledger_csv.open() as stream:
+            rows = list(csv.DictReader(stream))
+        series_rows = [row for row in rows if row["investment_index"] == "2"]
+        assert sorted(int(row["maturity_month"]) for row in series_rows) == list(range(13, 37))
+        assert sorted({int(row["opening_month"]) for row in series_rows}) == list(range(1, 13))
+        assert Decimal(series_rows[0]["opening_balance"]) == Decimal("1000")
+
+        # Act
+        resolved_request = output / "resolved-request.json"
+        replay = _cli("run", "--request", str(resolved_request), "--output", str(tmp_path / "replay"))
+
+        # Assert
+        assert replay.returncode == 0, replay.stderr
+        stored_investments = json.loads(resolved_request.read_text())["scenarios"][0]["investment"]
+        assert len(stored_investments) == 2
+        replayed_report = RunReport.model_validate_json(replay.stdout)
+        assert replayed_report.results == report.results
+        assert replayed_report.comparison == report.comparison
+        assert replayed_report.artifacts["investment_ledger"].read_text() == ledger_csv.read_text()
+        deposit_csv = report.artifacts["investment_deposits"]
+        assert replayed_report.artifacts["investment_deposits"].read_text() == deposit_csv.read_text()
+
+    def test_when_request_uses_legacy_investment_object_expect_resolved_list(self, tmp_path: Path) -> None:
+        # Arrange
+        terms = default_mortgage_terms(analysis_horizon_months=12)
+        request = tmp_path / "legacy.json"
+        output = tmp_path / "first"
+        legacy_deposit = {
+            "initial_amount": "1000",
+            "start_month": 1,
+            "annual_rate": "0.10",
+            "term_months": 6,
+            "term_count": 1,
+        }
+        request.write_text(
+            json.dumps(
+                {
+                    "terms": terms.model_dump(mode="json"),
+                    "scenarios": [{"name": "Legacy deposit", "investment": legacy_deposit}],
+                }
+            )
+        )
+
+        # Act
+        completed = _cli("run", "--request", str(request), "--output", str(output))
+
+        # Assert
+        assert completed.returncode == 0, completed.stderr
+        resolved = json.loads((output / "resolved-request.json").read_text())
+        investments = resolved["scenarios"][0]["investment"]
+        assert len(investments) == 1
+        assert {field: investments[0][field] for field in legacy_deposit} == legacy_deposit
+        report = RunReport.model_validate_json(completed.stdout)
+        outcome = report.results[1].investment
+        assert outcome is not None
+        assert outcome.applied_repayment == Decimal("1040.50")
 
     @pytest.mark.parametrize("strategy", ["fixed", "target", "lump", "manual", "automatic"])
     def test_when_supported_strategy_expect_direct_engine_parity(self, tmp_path: Path, strategy: str) -> None:

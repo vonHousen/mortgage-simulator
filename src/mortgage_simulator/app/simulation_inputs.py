@@ -9,6 +9,7 @@ import streamlit as st
 
 from mortgage_simulator.settings import AppSettings
 from mortgage_simulator.simulation.models import (
+    DepositInvestment,
     FeeTerms,
     InsuranceCalculationMethod,
     InterestCalculationMethod,
@@ -91,6 +92,7 @@ def build_request(
     terms: MortgageTerms,
     scenario_data: pl.DataFrame,
     lump_sum_data: pl.DataFrame,
+    investments: dict[str, tuple[DepositInvestment, ...]] | None = None,
 ) -> SimulationRequest:
     """Build a validated simulation request from edited scenario frames.
 
@@ -99,6 +101,7 @@ def build_request(
         terms: Validated mortgage terms to use for every scenario.
         scenario_data: Edited rows for recurring overpayment scenarios.
         lump_sum_data: Edited rows for one-off overpayments.
+        investments: Configured deposit entries keyed by custom scenario name.
 
     Returns:
         Validated request with the baseline scenario first.
@@ -121,6 +124,7 @@ def build_request(
                 cash_outflow_target=cash_outflow_target,
                 recurring_start_month=int(start_value) if start_value is not None else None,
                 lump_sums=tuple(lump_sums_by_scenario.get(name, [])),
+                investment=investments.get(name, ()) if investments else (),
             )
         )
     return SimulationRequest(terms=terms, scenarios=tuple(scenarios))
