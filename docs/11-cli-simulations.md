@@ -80,9 +80,10 @@ rates are fractions, dates are ISO dates, and payment months are indexed from th
 Automatic deposit timing minimizes Net financing cost using the shared engine; the CLI does not introduce a general
 strategy search. [Understanding the metrics](10-understanding-metrics.md) explains this objective and its interpretation.
 
-At least one custom scenario is required. A no-overpayment baseline is added automatically; its reserved name is
-defined by `BASELINE_NAME` in [application contracts](../src/mortgage_simulator/application/models.py).
-Custom names must be unique. Ask about missing material assumptions instead of silently guessing them.
+The `scenarios` array is required. Use `"scenarios": []` to run only the automatically added no-overpayment baseline.
+Its reserved name is defined by `BASELINE_NAME` in
+[application contracts](../src/mortgage_simulator/application/models.py). Custom names must be unique.
+Ask about missing material assumptions instead of silently guessing them.
 
 For “invest X or pay it now?”, compare an immediate lump sum with an investment starting with the same amount
 on the same payment date. Ask for missing assumptions such as the deposit rate and term. If the saved schedule

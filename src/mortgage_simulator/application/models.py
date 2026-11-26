@@ -22,7 +22,7 @@ class ComparisonInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     terms: dict[str, JsonValue] = Field(default_factory=dict)
-    scenarios: tuple[OverpaymentScenario, ...] = Field(min_length=1)
+    scenarios: tuple[OverpaymentScenario, ...]
 
 
 class ScenarioOutcome(BaseModel):

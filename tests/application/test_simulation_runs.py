@@ -39,15 +39,16 @@ class TestResolveRequest:
         assert resolved.terms.rate_periods[0].annual_rate == Decimal("0.065")
         assert [scenario.name for scenario in resolved.scenarios] == ["Extra"]
 
-    @pytest.mark.parametrize("scenarios", [[], [{"name": "Baseline"}], [{"name": "Same"}, {"name": "Same"}]])
+    @pytest.mark.parametrize(
+        "request_fields",
+        [{}, {"scenarios": [{"name": "Baseline"}]}, {"scenarios": [{"name": "Same"}, {"name": "Same"}]}],
+    )
     def test_when_invalid_scenarios_expect_validation_error(
-        self, tmp_path: Path, scenarios: list[dict[str, str]]
+        self, tmp_path: Path, request_fields: dict[str, list[dict[str, str]]]
     ) -> None:
         # Arrange
         request = tmp_path / "request.json"
-        request.write_text(
-            json.dumps({"terms": default_mortgage_terms().model_dump(mode="json"), "scenarios": scenarios})
-        )
+        request.write_text(json.dumps({"terms": default_mortgage_terms().model_dump(mode="json"), **request_fields}))
         # Act / Assert
         with pytest.raises(ValueError):
             resolve_request(request)

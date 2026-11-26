@@ -9,9 +9,20 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from streamlit.testing.v1 import AppTest
 
+from mortgage_simulator.app.session_state import RESULTS_KEY, TERMS_KEY
+from mortgage_simulator.application.models import RunReport
+from mortgage_simulator.reporting.payment_schedules import schedule_csv
+from mortgage_simulator.reporting.scenario_comparison import compare
 from mortgage_simulator.simulation.engine import simulate
-from mortgage_simulator.simulation.models import DepositInvestment, InvestmentMode, LumpSum, OverpaymentScenario
+from mortgage_simulator.simulation.models import (
+    DepositInvestment,
+    InvestmentMode,
+    LumpSum,
+    OverpaymentScenario,
+    SimulationResult,
+)
 from tests.factories import default_mortgage_terms
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -77,6 +88,47 @@ class TestHeadlessCli:
         assert {"principal", "fees"} <= set(json.loads(exported.stdout)["fields_needing_attention"])
         assert json.loads(draft.read_text())["principal"] == "${MORTGAGE_TEST_PRINCIPAL}"
 
+    def test_when_scenarios_empty_expect_gui_baseline_and_replay(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("MS_SCENARIOS__CONFIG_PATH", str(tmp_path / "absent.json"))
+        monkeypatch.setenv("MS_SCENARIOS__BASELINE_NAME", "Baseline")
+        terms = default_mortgage_terms(analysis_horizon_months=12)
+        request = tmp_path / "baseline.json"
+        request.write_text(json.dumps({"terms": terms.model_dump(mode="json"), "scenarios": []}))
+        output = tmp_path / "first"
+        resolved_request = output / "resolved-request.json"
+        gui = AppTest.from_file(ROOT / "src/mortgage_simulator/app/streamlit_app.py").run()
+        gui.session_state[TERMS_KEY] = terms
+
+        # Act
+        gui.switch_page("app_pages/overpayment_scenarios.py").run()
+        next(button for button in gui.button if button.label == "Run simulation").click().run()
+        completed = _cli("run", "--request", str(request), "--output", str(output))
+
+        # Assert
+        assert not gui.exception
+        assert not gui.error
+        gui_results: tuple[SimulationResult, ...] = gui.session_state[RESULTS_KEY]
+        assert completed.returncode == 0, completed.stderr
+        report = RunReport.model_validate_json(completed.stdout)
+        assert [result.scenario_name for result in report.results] == ["Baseline"]
+        assert report.results[0].summary == gui_results[0].summary
+        assert report.comparison == compare(gui_results)
+        assert report.artifacts["mortgage_schedules"].read_text() == schedule_csv(gui_results)
+        assert json.loads(resolved_request.read_text())["scenarios"] == []
+
+        # Act
+        replay = _cli("run", "--request", str(resolved_request), "--output", str(tmp_path / "replay"))
+
+        # Assert
+        assert replay.returncode == 0, replay.stderr
+        replayed_report = RunReport.model_validate_json(replay.stdout)
+        assert replayed_report.results == report.results
+        assert replayed_report.comparison == report.comparison
+
     @pytest.mark.parametrize("strategy", ["fixed", "target", "lump", "manual", "automatic"])
     def test_when_supported_strategy_expect_direct_engine_parity(self, tmp_path: Path, strategy: str) -> None:
         # Arrange
@@ -135,7 +187,7 @@ class TestHeadlessCli:
         assert json.loads(first.stdout)["results"] == json.loads(replayed.stdout)["results"]
         assert "scenarios" in json.loads(schema.stdout)["properties"]
 
-    @pytest.mark.parametrize("contents", ["{", '{"scenarios": []}', '{"scenarios": [{"name":"Baseline"}]}'])
+    @pytest.mark.parametrize("contents", ["{", '{"scenarios": [{"name":"Baseline"}]}'])
     def test_when_invalid_request_expect_usage_error_without_artifacts(self, tmp_path: Path, contents: str) -> None:
         # Arrange
         request = tmp_path / "invalid.json"
