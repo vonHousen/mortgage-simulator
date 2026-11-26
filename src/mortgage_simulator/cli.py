@@ -10,7 +10,13 @@ from typing import Annotated
 
 import typer
 
-from mortgage_simulator.application.simulation_runs import export_profile, input_schema, run_comparison
+from mortgage_simulator.application.simulation_runs import (
+    draft_profile,
+    export_profile,
+    input_schema,
+    run_comparison,
+    validate_profile,
+)
 
 app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 profile_app = typer.Typer(no_args_is_help=True)
@@ -34,6 +40,34 @@ def profile_export(output: Annotated[Path, typer.Option(help="New profile JSON p
     """
     with _command_errors():
         typer.echo(json.dumps({"profile": str(export_profile(output))}))
+
+
+@profile_app.command("draft")
+def profile_draft(
+    env_file: Annotated[Path, typer.Option(help="Dotenv file supplying the starting mortgage settings.")],
+    output: Annotated[Path, typer.Option(help="New draft JSON path.")],
+) -> None:
+    """Draft an editable profile from explicitly supplied mortgage settings.
+
+    Args:
+        env_file: File containing the mortgage settings to import.
+        output: Destination for the editable draft.
+    """
+    with _command_errors():
+        fields = draft_profile(env_file, output)
+        typer.echo(json.dumps({"draft": str(output), "fields_needing_attention": fields}))
+
+
+@profile_app.command("validate")
+def profile_validate(profile: Annotated[Path, typer.Argument(help="Complete JSON profile to validate.")]) -> None:
+    """Check whether a profile is ready for use in a comparison.
+
+    Args:
+        profile: Profile file to validate.
+    """
+    with _command_errors():
+        validate_profile(profile)
+        typer.echo(json.dumps({"profile": str(profile)}))
 
 
 @app.command()

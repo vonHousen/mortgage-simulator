@@ -1,22 +1,23 @@
 """Environment-backed application configuration and domain conversion."""
 
+from collections.abc import Mapping
 from datetime import date
 from decimal import Decimal
+from json import JSONDecodeError
 from pathlib import Path
 from typing import Any
 
+from dotenv import dotenv_values
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.fields import FieldInfo
 from pydantic_settings import BaseSettings, EnvSettingsSource, PydanticBaseSettingsSource, SettingsConfigDict
+from pydantic_settings.sources.utils import parse_env_vars
 
 from mortgage_simulator.simulation.models import (
-    FeeTerms,
     InsuranceCalculationMethod,
     InterestCalculationMethod,
     MortgageTerms,
     NonEmptyName,
-    RatePeriod,
-    SubsidyTerms,
 )
 
 FIRST_RATE_KEY = "annual_rate_months_1_60"
@@ -219,29 +220,71 @@ class AppSettings(BaseSettings):
         Returns:
             Complete mortgage terms accepted by the simulation domain.
         """
-        mortgage = self.mortgage
-        return MortgageTerms(
-            first_payment_date=mortgage.first_payment_date,
-            interest_calculation_method=mortgage.interest_calculation_method,
-            principal=mortgage.principal,
-            contractual_term_months=mortgage.contractual_term_months,
-            analysis_horizon_months=mortgage.analysis_horizon_months,
-            settle_remaining_principal_at_horizon=mortgage.settle_remaining_principal_at_horizon,
-            rate_periods=(
-                RatePeriod(start_month=1, end_month=60, annual_rate=mortgage.annual_rate_months_1_60),
-                RatePeriod(start_month=61, end_month=120, annual_rate=mortgage.annual_rate_months_61_120),
-            ),
-            subsidy=SubsidyTerms(
-                enabled=mortgage.subsidy.enabled,
-                coefficient=mortgage.subsidy.coefficient_months_1_60,
-                second_coefficient=mortgage.subsidy.coefficient_months_61_120,
-                reference_rate=mortgage.subsidy.reference_rate,
-            ),
-            fees=FeeTerms(
-                annual_fixed_fee=mortgage.fees.annual_fixed_fee,
-                monthly_insurance_rate=mortgage.fees.monthly_insurance_rate,
-                insurance_calculation_method=mortgage.fees.insurance_calculation_method,
-                monthly_fixed_fees=mortgage.fees.monthly_fixed_fees,
-                insurance_end_month=mortgage.fees.insurance_end_month,
-            ),
+        return MortgageTerms.model_validate(_mortgage_terms_input(self.mortgage.model_dump()))
+
+
+def mortgage_terms_draft(env_file: Path) -> dict[str, Any]:
+    """Translate explicit file values to editable mortgage terms.
+
+    Args:
+        env_file: Dotenv file supplying the draft's initial values.
+    """
+    source = _LegacyKeyRejectingSource(_MortgageDotenvSource(env_file))
+    mortgage = source().get("mortgage", {})
+    if not isinstance(mortgage, dict):
+        raise ValueError("MS_MORTGAGE must contain a JSON object when supplied")
+    supplied = {key: value for key, value in mortgage.items() if key in MortgageConfig.model_fields}
+    for key, config in (("fees", FeeConfig), ("subsidy", SubsidyConfig)):
+        group = supplied.get(key)
+        if isinstance(group, dict):
+            supplied[key] = {name: value for name, value in group.items() if name in config.model_fields}
+    return _mortgage_terms_input(supplied)
+
+
+class _MortgageDotenvSource(EnvSettingsSource):
+    """Parse mortgage settings from literal assignments in a single file."""
+
+    def __init__(self, env_file: Path) -> None:
+        self._env_file = env_file
+        super().__init__(AppSettings)
+
+    def decode_complex_value(self, field_name: str, field: FieldInfo, value: Any) -> Any:
+        """Preserve invalid group values so draft validation can identify them."""
+        try:
+            return super().decode_complex_value(field_name, field, value)
+        except JSONDecodeError:
+            return value
+
+    def _load_env_vars(self) -> Mapping[str, str | None]:
+        with self._env_file.open(encoding="utf-8") as stream:
+            values = dotenv_values(stream=stream, interpolate=False)
+        mortgage_prefix = f"{self.env_prefix.lower()}mortgage"
+        return parse_env_vars(
+            {
+                key: value
+                for key, value in values.items()
+                if key.lower() == mortgage_prefix
+                or key.lower().startswith((f"{mortgage_prefix}{self.env_nested_delimiter}", LEGACY_ENV_PREFIX))
+            },
+            self.case_sensitive,
+            self.env_ignore_empty,
+            self.env_parse_none_str,
         )
+
+
+def _mortgage_terms_input(mortgage: dict[str, Any]) -> dict[str, Any]:
+    terms = mortgage.copy()
+    rate_periods = []
+    for key, start, end in ((FIRST_RATE_KEY, 1, 60), (SECOND_RATE_KEY, 61, 120)):
+        period: dict[str, Any] = {"start_month": start, "end_month": end}
+        if key in terms:
+            period["annual_rate"] = terms.pop(key)
+        rate_periods.append(period)
+    terms["rate_periods"] = rate_periods
+    subsidy = terms.get("subsidy", {})
+    if isinstance(subsidy, dict):
+        names = {"coefficient_months_1_60": "coefficient", "coefficient_months_61_120": "second_coefficient"}
+        subsidy = {names.get(key, key): value for key, value in subsidy.items()}
+    terms["subsidy"] = subsidy
+    terms.setdefault("fees", {})
+    return terms

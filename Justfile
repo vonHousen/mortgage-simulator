@@ -53,6 +53,14 @@ ci: pre-commit mypy test
 simulation-profile-export output:
     @uv run mortgage-simulator profile export --output {{quote(output)}}
 
+# Draft a profile using only the specified dotenv file.
+simulation-profile-draft env_file output:
+    @uv run mortgage-simulator profile draft --env-file {{quote(env_file)}} --output {{quote(output)}}
+
+# Validate a complete mortgage profile.
+simulation-profile-validate profile:
+    @uv run mortgage-simulator profile validate {{quote(profile)}}
+
 # Print a profile or request JSON schema.
 simulation-schema kind:
     @uv run mortgage-simulator schema {{quote(kind)}}

@@ -480,6 +480,7 @@ dependencies = [
     { name = "polars" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "python-dotenv" },
     { name = "streamlit" },
     { name = "typer" },
 ]
@@ -503,6 +504,7 @@ requires-dist = [
     { name = "polars" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "python-dotenv" },
     { name = "streamlit" },
     { name = "typer", specifier = ">=0.29.1" },
 ]

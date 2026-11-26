@@ -6,6 +6,33 @@ The CLI uses the same [financial model](02-design.md) and reporting functions as
 
 ## Prepare a profile
 
+### Set up “my mortgage” from `.env`
+
+Run the recipes from the checkout with the CLI. Locate the main checkout with
+`git rev-parse --path-format=absolute --git-common-dir`; for a standard checkout, the main checkout is the parent of
+the returned `.git` directory. Use the main checkout’s `.env` and reserve its ignored `data/config/my-mortgage.json`
+as the approved profile. If the location cannot be resolved or the source is missing, ask for the intended file.
+
+Create the ignored `data/config` directory in the main checkout, then use a fresh draft filename there. For example,
+with `main_checkout` set to the absolute main checkout path:
+
+```bash
+just simulation-profile-draft "$main_checkout/.env" "$main_checkout/data/config/mortgage-draft.json"
+just simulation-profile-validate "$main_checkout/data/config/mortgage-draft.json"
+```
+
+The draft reads literal mortgage assignments from the supplied file. Its JSON output reports
+`fields_needing_attention` as dotted paths with zero-based array indexes. Ask about missing or invalid terms
+and edit the draft with the answers. Use `just simulation-schema profile` for field types and
+`simulation-profile-validate` for cross-field diagnostics. Review the resulting terms with the user. After the user
+approves the validated draft, rename it to `my-mortgage.json` in the same directory. Refresh follows the same workflow,
+with the existing file serving comparisons until the replacement is approved.
+
+For “my mortgage,” use the approved absolute path from any linked worktree. Ask for setup or correction if the
+file cannot be loaded and validated. Honor an explicitly requested alternate profile.
+
+### Export the current application settings
+
 Run commands from the repository root after `just sync`. Create local working directories:
 
 ```bash
@@ -56,6 +83,14 @@ strategy search. [Understanding the metrics](10-understanding-metrics.md) explai
 At least one custom scenario is required. A no-overpayment baseline is added automatically; its reserved name is
 defined by `BASELINE_NAME` in [application contracts](../src/mortgage_simulator/application/models.py).
 Custom names must be unique. Ask about missing material assumptions instead of silently guessing them.
+
+For “invest X or pay it now?”, compare an immediate lump sum with an investment starting with the same amount
+on the same payment date. Ask for missing assumptions such as the deposit rate and term. If the saved schedule
+starts in the past, ask whether to use its modeled balance or wait for current terms. With permission, use the
+first eligible installment on or after today and use its month index for both scenarios. Confirm the date and
+read the modeled opening balance from the baseline row in `mortgage-schedules.csv`. If the installment's
+eligibility is unclear or the baseline has no row for that date, clarify before reporting a comparison. Report the
+balance source, payment date, and difference in Net financing cost between the two strategies.
 
 ## Run and replay
 

@@ -1,15 +1,17 @@
 """Resolve, execute, and export reproducible headless comparisons."""
 
+import json
 from pathlib import Path
 from typing import Any
 
 import polars as pl
+from pydantic import ValidationError
 
 from mortgage_simulator.application.models import BASELINE_NAME, ComparisonInput, RunReport, ScenarioOutcome
 from mortgage_simulator.reporting.investment_schedules import investment_candidates_frame, investment_ledger_frame
 from mortgage_simulator.reporting.payment_schedules import schedule_csv
 from mortgage_simulator.reporting.scenario_comparison import compare
-from mortgage_simulator.settings import AppSettings
+from mortgage_simulator.settings import AppSettings, mortgage_terms_draft
 from mortgage_simulator.simulation.engine import simulate
 from mortgage_simulator.simulation.models import MortgageTerms, OverpaymentScenario, SimulationRequest, SimulationResult
 
@@ -27,6 +29,41 @@ def export_profile(output: Path) -> Path:
     with output.open("x", encoding="utf-8") as destination:
         destination.write(terms.model_dump_json(indent=2) + "\n")
     return output
+
+
+def draft_profile(env_file: Path, output: Path) -> list[str]:
+    """Save explicitly supplied terms and report missing or invalid fields.
+
+    Args:
+        env_file: Dotenv file with the starting mortgage settings.
+        output: New JSON draft path.
+
+    Returns:
+        Dotted field paths needing review, or ``terms`` for a cross-field error.
+    """
+    draft = mortgage_terms_draft(env_file)
+    fields_needing_attention = []
+    try:
+        MortgageTerms.model_validate(draft, extra="forbid")
+    except ValidationError as error:
+        fields_needing_attention = [
+            ".".join(map(str, issue["loc"])) or "terms" for issue in error.errors(include_input=False)
+        ]
+    with output.open("x", encoding="utf-8") as destination:
+        destination.write(json.dumps(draft, indent=2) + "\n")
+    return fields_needing_attention
+
+
+def validate_profile(profile: Path) -> MortgageTerms:
+    """Load complete mortgage terms from a JSON profile.
+
+    Args:
+        profile: Existing JSON profile or edited draft.
+
+    Returns:
+        Validated mortgage terms.
+    """
+    return MortgageTerms.model_validate_json(profile.read_text(encoding="utf-8"), extra="forbid")
 
 
 def input_schema(kind: str) -> dict[str, Any]:
@@ -58,11 +95,7 @@ def resolve_request(request: Path, profile: Path | None = None) -> SimulationReq
     supplied = ComparisonInput.model_validate_json(request.read_text(encoding="utf-8"), extra="forbid")
     if any(scenario.name == BASELINE_NAME for scenario in supplied.scenarios):
         raise ValueError(f"scenario name {BASELINE_NAME!r} is reserved for the automatic baseline")
-    base = (
-        MortgageTerms.model_validate_json(profile.read_text(encoding="utf-8"), extra="forbid").model_dump(mode="json")
-        if profile is not None
-        else {}
-    )
+    base = validate_profile(profile).model_dump(mode="json") if profile is not None else {}
     terms = MortgageTerms.model_validate(_merge_objects(base, supplied.terms), extra="forbid")
     return SimulationRequest(terms=terms, scenarios=supplied.scenarios)
 

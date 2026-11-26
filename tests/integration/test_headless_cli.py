@@ -19,6 +19,64 @@ EXECUTABLE = Path(sys.executable).with_name("mortgage-simulator")
 
 
 class TestHeadlessCli:
+    def test_when_dotenv_incomplete_expect_editable_profile_draft(self, tmp_path: Path) -> None:
+        # Arrange
+        source = tmp_path / "mortgage settings.env"
+        source.write_text(
+            "MS_MORTGAGE__PRINCIPAL=456789.12\n"
+            "MS_MORTGAGE__ANNUAL_RATE_MONTHS_1_60=0.04\n"
+            "MS_MORTGAGE__FEES__INSURANCE_END_MONTH=null\n"
+            "MS_MORTGAGE__FEES__UNRELATED_SECRET=private\n"
+            "MS_MORTGAGE__UNRELATED_SECRET=private\n"
+            "UNRELATED_SECRET=private\n"
+        )
+        draft = tmp_path / "mortgage draft.json"
+        environment = os.environ | {"MS_MORTGAGE__PRINCIPAL": "1", "MS_MORTGAGE__ANNUAL_RATE_MONTHS_61_120": "0.05"}
+
+        # Act
+        exported = _just("simulation-profile-draft", str(source), str(draft), env=environment)
+        invalid = _just("simulation-profile-validate", str(draft))
+
+        # Assert
+        assert exported.returncode == 0, exported.stderr
+        report = json.loads(exported.stdout)
+        partial = json.loads(draft.read_text())
+        assert partial["principal"] == "456789.12"
+        assert partial["rate_periods"][0]["annual_rate"] == "0.04"
+        assert "annual_rate" not in partial["rate_periods"][1]
+        assert partial["fees"] == {"insurance_end_month": None}
+        assert "private" not in draft.read_text()
+        assert "rate_periods.1.annual_rate" in report["fields_needing_attention"]
+        assert invalid.returncode != 0
+
+        # Act
+        complete = default_mortgage_terms(principal=Decimal(partial["principal"])).model_dump(mode="json")
+        complete["rate_periods"][0].update(partial["rate_periods"][0])
+        draft.write_text(json.dumps(complete))
+        validated = _just("simulation-profile-validate", str(draft))
+        request = _request_file(tmp_path, {}, _scenario("lump"))
+        run = _just("simulate", str(request), str(tmp_path / "run"), str(draft))
+
+        # Assert
+        assert validated.returncode == 0, validated.stderr
+        assert run.returncode == 0, run.stderr
+        assert json.loads((tmp_path / "run" / "resolved-request.json").read_text())["terms"]["principal"] == "456789.12"
+
+    def test_when_dotenv_uses_interpolation_expect_literal_draft_value_flagged(self, tmp_path: Path) -> None:
+        # Arrange
+        source = tmp_path / ".env"
+        source.write_text("MS_MORTGAGE__PRINCIPAL=${MORTGAGE_TEST_PRINCIPAL}\nMS_MORTGAGE__FEES=invalid\n")
+        draft = tmp_path / "draft.json"
+        environment = os.environ | {"MORTGAGE_TEST_PRINCIPAL": "123456.78"}
+
+        # Act
+        exported = _cli("profile", "draft", "--env-file", str(source), "--output", str(draft), env=environment)
+
+        # Assert
+        assert exported.returncode == 0, exported.stderr
+        assert {"principal", "fees"} <= set(json.loads(exported.stdout)["fields_needing_attention"])
+        assert json.loads(draft.read_text())["principal"] == "${MORTGAGE_TEST_PRINCIPAL}"
+
     @pytest.mark.parametrize("strategy", ["fixed", "target", "lump", "manual", "automatic"])
     def test_when_supported_strategy_expect_direct_engine_parity(self, tmp_path: Path, strategy: str) -> None:
         # Arrange
