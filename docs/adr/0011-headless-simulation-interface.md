@@ -17,6 +17,10 @@ baseline insertion, validation, simulation orchestration, and artifact exports. 
 reporting owns comparison and schedule projections. Extract investment projections from the UI into reporting so
 both interfaces reuse them, with UI labels and display formatting remaining in Streamlit.
 
+Every simulation capability must be available through both the GUI and CLI, using shared application/domain logic.
+Interface-specific presentation and operational features are exempt. Integration tests must verify equivalent
+results for equivalent inputs across both interfaces.
+
 Dependencies flow from Just to Typer to application services, and from services to settings, simulation, and reporting.
 Reporting depends on simulation models. Streamlit remains a separate interface consuming simulation/reporting code.
 The CLI and application services must never import or launch Streamlit; neither shared reporting nor simulation may

@@ -13,6 +13,9 @@ All the necessary context can be found in the [docs](docs/) directory. Among oth
 For headless simulation requests, use the [run-mortgage-simulation skill](.agents/skills/run-mortgage-simulation/SKILL.md).
 It routes to the maintained [Just workflow](docs/11-cli-simulations.md).
 
+Simulation features must support both GUI and CLI with equivalent results, as required by
+[ADR 0011](docs/adr/0011-headless-simulation-interface.md#decision).
+
 ## Development commands
 
 - This project uses `uv` for package management (prepend all commands with `uv run`, e.g. `uv run pytest` instead of activating the virtual environment)
