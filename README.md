@@ -43,8 +43,8 @@ to an instance that untrusted users can access.
 
 ## Run simulations without the UI
 
-Use the [headless Just workflow](docs/11-cli-simulations.md) to export a mortgage profile, compare named strategies,
-and replay saved inputs. Agents can use the [repository skill](.agents/skills/run-mortgage-simulation/SKILL.md).
+Use the [CLI QA quick start](docs/11-cli-simulations.md#start-here-for-cli-qa) to choose the right mortgage terms,
+compare named strategies, and replay saved inputs. Agents can use the [repository skill](.agents/skills/run-mortgage-simulation/SKILL.md).
 The CLI shares the calculation engine and reporting code with Streamlit and never starts the UI.
 
 ## Development

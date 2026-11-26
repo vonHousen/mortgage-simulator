@@ -4,6 +4,21 @@ Run comparisons through Just without starting Streamlit. An agent can use the re
 [simulation skill](../.agents/skills/run-mortgage-simulation/SKILL.md) to translate a question into explicit inputs.
 The CLI uses the same [financial model](02-design.md) and reporting functions as the UI.
 
+## Start here for CLI QA
+
+Run `just sync` from the checkout containing the CLI. Choose the mortgage terms based on what you are checking:
+
+| QA task | Terms to use |
+| --- | --- |
+| Check a strategy on “my mortgage” | Pass the approved profile at `data/config/my-mortgage.json` in the main checkout, or an alternate profile the user explicitly selected. If the profile is missing or invalid, pause and ask about [setup or correction](#set-up-my-mortgage-from-env). |
+| Smoke-test the CLI or a feature | Use a synthetic profile or put complete synthetic `terms` in the request. Personal setup is optional for synthetic checks. |
+| Replay an earlier run | Use its `resolved-request.json` by itself. It already contains the complete terms and scenarios. |
+
+For a smoke test, use `"scenarios": []` to check the baseline, then add a named scenario to check the behavior
+under test. Run and replay into separate output directories. Verify the resolved terms, the scenario results and
+baseline comparisons in `results.json`, and the relevant rows in `mortgage-schedules.csv`. Compare the result
+values on replay because the artifact paths will differ. Keep local profiles, requests, and output under ignored `data/`.
+
 ## Prepare a profile
 
 ### Set up “my mortgage” from `.env`
